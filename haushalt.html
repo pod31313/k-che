@@ -95,6 +95,17 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI'
 .child-selector { display: flex; gap: 6px; padding: 4px 4px 10px; }
 .child-btn { flex: 1; padding: 7px 4px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--card); font-size: 0.78rem; font-weight: 600; cursor: pointer; text-align: center; transition: all .15s; color: var(--gray); }
 .child-btn.active { color: white; border-color: transparent; }
+.week-child-legend { display: flex; gap: 14px; padding: 10px 4px 4px; font-size: 0.76rem; color: var(--text-2); flex-wrap: wrap; border-top: 1px solid var(--border); margin-top: 6px; }
+.leg-child { display: flex; align-items: center; gap: 5px; font-weight: 600; }
+.alle-dots { display: flex; gap: 2px; justify-content: center; align-items: center; }
+.wdot-mini { width: 19px; height: 19px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.58rem; font-weight: 700; flex-shrink: 0; }
+.wdot-mini.E { background: #007AFF22; color: var(--blue); }
+.wdot-mini.B { background: #34C75922; color: var(--green); }
+.wdot-mini.miss { background: var(--gray-light); }
+.wdot-mini.fut  { background: transparent; }
+.wdot-mini.skip { background: transparent; color: var(--text-2); font-size: 0.75rem; border-radius: 0; width: 14px; }
+.alle-subheader th { padding: 0 0 6px !important; }
+.alle-sub-dots { display: flex; gap: 2px; justify-content: center; }
 
 /* ── BOTTOM NAV ── */
 .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,0.94); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid var(--border); display: flex; padding-bottom: var(--safe-b); z-index: 100; }
@@ -471,16 +482,63 @@ function renderWeek(data){
   const el=document.getElementById('content');
   const wd=weekDates(), t0=today();
 
-  let tasks, idx={};
-  if(currentList==='kinder'){
-    // For kinder: show selected child's tasks
-    tasks=allTasks.filter(t=>t.list_name==='kinder'&&t.child_name===weekChild&&t.day_of_week===null);
-    const taskIds=new Set(tasks.map(t=>t.id));
-    data.filter(c=>taskIds.has(c.task_id)).forEach(c=>{ idx[c.task_id+'_'+c.date]=c; });
+  let trows='', allIdx={};
+  const allTaskIds=new Set(allTasks.map(t=>t.id));
+  data.filter(c=>allTaskIds.has(c.task_id)).forEach(c=>{ allIdx[c.task_id+'_'+c.date]=c; });
+
+  if(currentList==='kinder' && weekChild==='Alle'){
+    // ── Alle Kinder: gruppiert nach Aufgabentext ──
+    // Baue Map: text → { Anton: taskId|null, Friedrich: taskId|null, Justus: taskId|null, sortOrder }
+    const textMap = {};
+    allTasks.filter(t=>t.list_name==='kinder'&&t.day_of_week===null).forEach(t=>{
+      if(!textMap[t.text]) textMap[t.text]={ sortOrder: t.sort_order||999 };
+      textMap[t.text][t.child_name]=t.id;
+      if(t.sort_order < textMap[t.text].sortOrder) textMap[t.text].sortOrder=t.sort_order||999;
+    });
+    // Sortiere: geteilte Aufgaben (mehrere Kinder) zuerst, dann Einzelaufgaben; innerhalb: nach sortOrder
+    const sortedTexts=Object.keys(textMap).sort((a,b)=>{
+      const cA=CHILDREN.filter(c=>textMap[a][c]).length;
+      const cB=CHILDREN.filter(c=>textMap[b][c]).length;
+      if(cB!==cA) return cB-cA; // mehr Kinder zuerst
+      return (textMap[a].sortOrder||0)-(textMap[b].sortOrder||0);
+    });
+    trows=sortedTexts.map(text=>{
+      const entry=textMap[text];
+      const cells=wd.map(d=>{
+        const dots=CHILDREN.map(child=>{
+          const tid=entry[child];
+          if(!tid) return `<div class="wdot-mini skip">–</div>`;
+          const c=allIdx[tid+'_'+d], fut=d>t0;
+          if(c) return `<div class="wdot-mini ${c.done_by}">${c.done_by}</div>`;
+          if(fut) return `<div class="wdot-mini fut"></div>`;
+          return `<div class="wdot-mini miss"></div>`;
+        }).join('');
+        return `<td class="week-dot-td"><div class="alle-dots">${dots}</div></td>`;
+      }).join('');
+      return `<tr class="week-row-tr"><td class="week-name-td">${text}</td>${cells}</tr>`;
+    }).join('');
+  } else if(currentList==='kinder'){
+    const tasks=allTasks.filter(t=>t.list_name==='kinder'&&t.child_name===weekChild&&t.day_of_week===null);
+    trows=tasks.map(t=>{
+      const cells=wd.map(d=>{
+        const c=allIdx[t.id+'_'+d], fut=d>t0;
+        if(c) return `<td class="week-dot-td"><div class="wdot ${c.done_by}">${c.done_by}</div></td>`;
+        if(fut) return `<td class="week-dot-td"><div class="wdot fut"></div></td>`;
+        return `<td class="week-dot-td"><div class="wdot miss"></div></td>`;
+      }).join('');
+      return `<tr class="week-row-tr"><td class="week-name-td">${t.text}</td>${cells}</tr>`;
+    }).join('');
   } else {
-    tasks=filteredTasks();
-    const taskIds=new Set(tasks.map(t=>t.id));
-    data.filter(c=>taskIds.has(c.task_id)).forEach(c=>{ idx[c.task_id+'_'+c.date]=c; });
+    const tasks=filteredTasks();
+    trows=tasks.map(t=>{
+      const cells=wd.map(d=>{
+        const c=allIdx[t.id+'_'+d], fut=d>t0;
+        if(c) return `<td class="week-dot-td"><div class="wdot ${c.done_by}">${c.done_by}</div></td>`;
+        if(fut) return `<td class="week-dot-td"><div class="wdot fut"></div></td>`;
+        return `<td class="week-dot-td"><div class="wdot miss"></div></td>`;
+      }).join('');
+      return `<tr class="week-row-tr"><td class="week-name-td">${t.text}</td>${cells}</tr>`;
+    }).join('');
   }
 
   const headers=wd.map(d=>{
@@ -488,17 +546,10 @@ function renderWeek(data){
     return `<th class="${isT?'today-col':isWe?'weekend-col':''}">${DE_D[day.getDay()]}<br><span style="font-weight:400;font-size:.6rem">${day.getDate()}.${day.getMonth()+1}.</span></th>`;
   }).join('');
 
-  const trows=tasks.map(t=>{
-    const cells=wd.map(d=>{
-      const c=idx[t.id+'_'+d], fut=d>t0;
-      if(c) return `<td class="week-dot-td"><div class="wdot ${c.done_by}">${c.done_by}</div></td>`;
-      if(fut) return `<td class="week-dot-td"><div class="wdot fut"></div></td>`;
-      return `<td class="week-dot-td"><div class="wdot miss"></div></td>`;
-    }).join('');
-    return `<tr class="week-row-tr"><td class="week-name-td">${t.text}</td>${cells}</tr>`;
-  }).join('');
-
   const childSelector=currentList==='kinder'?`<div class="child-selector">
+    <button class="child-btn ${weekChild==='Alle'?'active':''}"
+      style="${weekChild==='Alle'?'background:linear-gradient(135deg,#007AFF,#AF52DE)':'color:var(--text-2)'}"
+      onclick="setWeekChild('Alle')">Alle</button>
     ${CHILDREN.map(c=>`<button class="child-btn ${weekChild===c?'active':''}"
       style="${weekChild===c?`background:${CHILD_BG[c]}`:'color:var(--text-2)'}"
       onclick="setWeekChild('${c}')">${c}</button>`).join('')}
@@ -520,10 +571,18 @@ function renderWeek(data){
       </div>
       <div class="week-scroll">
         <table class="week-table">
-          <thead><tr><th></th>${headers}</tr></thead>
+          <thead>
+            <tr><th></th>${headers}</tr>
+            ${currentList==='kinder'&&weekChild==='Alle'?`<tr class="alle-subheader"><th></th>${wd.map(()=>`<th><div class="alle-sub-dots">${CHILDREN.map(c=>`<div style="font-size:.58rem;font-weight:700;color:${CHILD_BG[c]};width:19px;text-align:center">${c[0]}</div>`).join('')}</div></th>`).join('')}</tr>`:''}
+          </thead>
           <tbody>${trows||'<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--text-2);font-size:.85rem">Keine Aufgaben</td></tr>'}</tbody>
         </table>
       </div>
+      ${currentList==='kinder'&&weekChild==='Alle'?`
+      <div class="week-child-legend">
+        ${CHILDREN.map(c=>`<div class="leg-child"><div class="wdot-mini" style="background:${CHILD_BG[c]}33;color:${CHILD_BG[c]}">${c[0]}</div><span style="color:${CHILD_BG[c]}">${c}</span></div>`).join('')}
+        <div class="leg-child" style="margin-left:auto;font-weight:400;color:var(--text-2)">· = nicht zugewiesen</div>
+      </div>`:``}
     </div>`;
 }
 
