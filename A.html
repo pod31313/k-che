@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Anton">
+<title>Anton</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+:root {
+  --c:     #007AFF;
+  --cl:    #007AFF22;
+  --gray:       #8E8E93;
+  --gray-light: #F2F2F7;
+  --gray-mid:   #E5E5EA;
+  --text:       #1C1C1E;
+  --text-2:     #8E8E93;
+  --bg:         #F2F2F7;
+  --card:       #FFFFFF;
+  --border:     #E5E5EA;
+  --green:      #34C759;
+  --r:          14px;
+  --safe-t:     env(safe-area-inset-top,    0px);
+  --safe-b:     env(safe-area-inset-bottom, 0px);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif; background: var(--bg); color: var(--text); overflow-x: hidden; }
+
+/* ── HEADER ── */
+.header {
+  background: var(--c);
+  padding: calc(var(--safe-t) + 16px) 20px 18px;
+  color: white;
+}
+.header-name { font-size: 1.6rem; font-weight: 800; }
+.header-date { font-size: 0.85rem; opacity: 0.85; margin-top: 2px; }
+.header-progress { margin-top: 14px; }
+.header-prog-label { font-size: 0.8rem; opacity: 0.9; margin-bottom: 6px; display: flex; justify-content: space-between; }
+.header-prog-bg { background: rgba(255,255,255,0.3); border-radius: 99px; height: 8px; overflow: hidden; }
+.header-prog-fill { height: 100%; background: white; border-radius: 99px; transition: width .4s ease; }
+
+/* ── ALL DONE ── */
+.all-done { text-align: center; padding: 40px 20px 20px; }
+.all-done .trophy { font-size: 4rem; margin-bottom: 12px; }
+.all-done h2 { font-size: 1.4rem; font-weight: 800; color: var(--c); margin-bottom: 6px; }
+.all-done p  { font-size: 0.9rem; color: var(--text-2); }
+
+/* ── CONTENT ── */
+.content { padding-bottom: calc(62px + var(--safe-b) + 16px); }
+
+/* ── TASK LIST ── */
+.section-label { font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-2); padding: 14px 18px 6px; }
+.task-list-wrap { padding: 0 14px 8px; }
+.task-card { background: var(--card); border-radius: var(--r); overflow: hidden; }
+.task-row { display: flex; align-items: center; gap: 14px; padding: 15px 16px; border-bottom: 1px solid var(--border); cursor: pointer; min-height: 58px; transition: background .1s; user-select: none; }
+.task-row:last-child { border-bottom: none; }
+.task-row:active { background: var(--gray-light); }
+.check {
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 2.5px solid var(--gray-mid); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; color: white; transition: all .15s;
+}
+.task-row.done .check { background: var(--green); border-color: var(--green); }
+.task-label { flex: 1; font-size: 1rem; line-height: 1.3; }
+.task-row.done .task-label { color: var(--text-2); text-decoration: line-through; }
+.day-badge { font-size: 0.7rem; font-weight: 700; color: var(--c); background: var(--cl); padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+
+/* ── BOTTOM NAV ── */
+.bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,0.94); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid var(--border); display: flex; padding-bottom: var(--safe-b); z-index: 100; }
+.nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 10px 4px; border: none; background: transparent; cursor: pointer; gap: 3px; color: var(--gray); font-size: 0.65rem; font-weight: 500; }
+.nav-btn .ico { font-size: 1.4rem; line-height: 1; }
+.nav-btn.active { color: var(--c); }
+
+/* ── WEEK VIEW ── */
+.week-wrap { padding: 0 14px 8px; }
+.week-nav { display: flex; align-items: center; justify-content: space-between; padding: 4px 4px 10px; }
+.week-nav-btn { padding: 8px 14px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--card); font-size: 0.84rem; font-weight: 600; color: var(--c); cursor: pointer; }
+.week-nav-btn:disabled { color: var(--gray); border-color: var(--gray-light); cursor: default; }
+.week-label { font-size: 0.82rem; font-weight: 600; text-align: center; flex: 1; }
+.week-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.week-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 320px; }
+.week-table thead th { font-size: 0.68rem; font-weight: 600; text-align: center; color: var(--text-2); padding: 0 0 8px; background: var(--bg); white-space: nowrap; }
+.week-table thead th.today-col { color: var(--c); }
+.week-row-tr { background: var(--card); }
+.week-row-tr:not(:last-child) td { border-bottom: 1px solid var(--border); }
+.week-name-td { font-size: 0.8rem; padding: 8px 8px 8px 12px; max-width: 0; width: 38%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.week-dot-td { text-align: center; padding: 5px 2px; }
+.wdot { width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; }
+.wdot.done { background: var(--cl); color: var(--c); font-weight: 700; }
+.wdot.miss { background: var(--gray-light); }
+.wdot.fut  { background: transparent; }
+.wdot.na   { background: transparent; }
+
+/* ── NOTES ── */
+.notes-wrap { padding: 0 14px 8px; }
+.note-card { background: var(--card); border-radius: var(--r); overflow: hidden; margin-bottom: 8px; }
+.note-row { display: flex; align-items: flex-start; gap: 10px; padding: 13px 14px; border-bottom: 1px solid var(--border); }
+.note-row:last-child { border-bottom: none; }
+.note-text { flex: 1; font-size: 0.92rem; line-height: 1.4; }
+.note-date { font-size: 0.7rem; color: var(--text-2); margin-top: 3px; }
+.note-del { background: none; border: none; font-size: 1.1rem; color: var(--text-2); cursor: pointer; padding: 0 4px; flex-shrink: 0; }
+.note-del:active { color: #FF3B30; }
+.add-note-wrap { padding: 0 14px 8px; }
+.add-note-row { display: flex; gap: 8px; }
+.add-note-input { flex: 1; border: 1.5px solid var(--border); border-radius: 12px; padding: 12px 14px; font-size: 0.95rem; font-family: inherit; background: var(--card); color: var(--text); outline: none; }
+.add-note-input:focus { border-color: var(--c); }
+.add-note-btn { background: var(--c); color: white; border: none; border-radius: 12px; padding: 12px 16px; font-size: 0.95rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.add-note-btn:active { opacity: .8; }
+.empty-notes { background: var(--card); border-radius: var(--r); padding: 30px 20px; text-align: center; color: var(--text-2); font-size: 0.9rem; }
+
+/* ── LOADING ── */
+.loading { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 50vh; gap: 14px; color: var(--text-2); }
+.spin { width: 30px; height: 30px; border-radius: 50%; border: 3px solid var(--gray-mid); border-top-color: var(--c); animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- Header (always visible) -->
+<div class="header" id="mainHeader">
+  <div class="header-name">🎵 Anton</div>
+  <div class="header-date" id="headerDate"></div>
+  <div class="header-progress">
+    <div class="header-prog-label">
+      <span id="progText">Lade …</span>
+      <span id="progPct"></span>
+    </div>
+    <div class="header-prog-bg">
+      <div class="header-prog-fill" id="progFill" style="width:0%"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Content -->
+<div class="content" id="content">
+  <div class="loading"><div class="spin"></div></div>
+</div>
+
+<!-- Bottom Nav -->
+<div class="bottom-nav">
+  <button class="nav-btn active" id="navH" onclick="setTab('h')"><span class="ico">✅</span>Heute</button>
+  <button class="nav-btn" id="navV" onclick="setTab('v')"><span class="ico">📅</span>Verlauf</button>
+  <button class="nav-btn" id="navN" onclick="setTab('n')"><span class="ico">📝</span>Notizen</button>
+</div>
+
+<script>
+const CHILD = 'Anton';
+const COLOR = '#007AFF';
+const SB_URL = 'https://ainggprkypgbghqxowpy.supabase.co';
+const SB_KEY = 'sb_publishable_kcGLDokPdR1CNS2X9npHDA_qeWu6URm';
+const db = supabase.createClient(SB_URL, SB_KEY);
+
+let myTasks = [];
+let todayC  = [];
+let tab     = 'h';
+let weekOffset = 0;
+let notes   = [];
+
+const DE_D  = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+const DE_DL = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+const DE_M  = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+
+function today() { return new Date().toISOString().split('T')[0]; }
+function todayDow() { return new Date().getDay(); }
+function fmtDate(d) { return `${DE_DL[d.getDay()]}, ${d.getDate()}. ${DE_M[d.getMonth()]}`; }
+function isWeekend(ds) { const d = ds ? new Date(ds+'T12:00:00') : new Date(); return d.getDay()===0||d.getDay()===6; }
+
+function weekDates() {
+  const now=new Date(), dow=now.getDay(), mon=new Date(now);
+  mon.setDate(now.getDate()-(dow===0?6:dow-1)+weekOffset*7);
+  return Array.from({length:7},(_,i)=>{ const d=new Date(mon); d.setDate(mon.getDate()+i); return d.toISOString().split('T')[0]; });
+}
+function weekLabel() {
+  const wd=weekDates();
+  const s=new Date(wd[0]+'T12:00:00'), e=new Date(wd[6]+'T12:00:00');
+  return `${s.getDate()}.${s.getMonth()+1}. – ${e.getDate()}.${e.getMonth()+1}.${e.getFullYear()}`;
+}
+
+async function loadMyTasks() {
+  const {data,error}=await db.from('tasks').select('*').eq('list_name','kinder').eq('child_name',CHILD).eq('active',true).order('sort_order');
+  if(error) throw error; myTasks=data||[];
+}
+async function loadToday() {
+  const {data,error}=await db.from('child_completions').select('*').eq('date',today()).eq('child_name',CHILD);
+  if(error) throw error; todayC=data||[];
+}
+async function loadWeek() {
+  const wd=weekDates();
+  const {data,error}=await db.from('child_completions').select('*').eq('child_name',CHILD).gte('date',wd[0]).lte('date',wd[6]);
+  if(error) throw error; return data||[];
+}
+async function loadNotes() {
+  const {data,error}=await db.from('child_notes').select('*').eq('child_name',CHILD).order('created_at',{ascending:false});
+  if(error) throw error; notes=data||[];
+}
+
+async function toggle(taskId) {
+  const existing=todayC.find(c=>c.task_id===taskId);
+  if(existing) { todayC=todayC.filter(c=>c.id!==existing.id); }
+  else { todayC.push({id:'_tmp',task_id:taskId,date:today(),child_name:CHILD}); }
+  renderToday();
+  if(existing) { await db.from('child_completions').delete().eq('id',existing.id); }
+  else {
+    const {data}=await db.from('child_completions').insert({task_id:taskId,date:today(),child_name:CHILD}).select().single();
+    if(data) { todayC=todayC.filter(c=>c.id!=='_tmp'); todayC.push(data); }
+  }
+}
+
+async function addNote() {
+  const input=document.getElementById('noteInput');
+  const text=input.value.trim(); if(!text) return;
+  const {data,error}=await db.from('child_notes').insert({child_name:CHILD,text}).select().single();
+  if(!error&&data) { notes.unshift(data); input.value=''; renderNotes(); }
+}
+async function deleteNote(id) {
+  notes=notes.filter(n=>n.id!==id); renderNotes();
+  await db.from('child_notes').delete().eq('id',id);
+}
+
+function setTab(t) {
+  tab=t;
+  ['H','V','N'].forEach(x=>document.getElementById('nav'+x).classList.remove('active'));
+  document.getElementById('nav'+t.toUpperCase()).classList.add('active');
+  renderTab();
+}
+async function renderTab() {
+  if(tab==='h') renderToday();
+  else if(tab==='v') { showLoading(); const d=await loadWeek().catch(()=>[]); renderWeek(d); }
+  else { await loadNotes(); renderNotes(); }
+}
+function showLoading() { document.getElementById('content').innerHTML='<div class="loading"><div class="spin"></div></div>'; }
+
+function updateHeader(done, total) {
+  const pct=total?Math.round(done/total*100):0;
+  document.getElementById('progText').textContent=done===total&&total>0?'Alles erledigt! 🎉':`${done} von ${total} erledigt`;
+  document.getElementById('progPct').textContent=pct+'%';
+  document.getElementById('progFill').style.width=pct+'%';
+  document.getElementById('progFill').style.background=done===total&&total>0?'#FFD60A':'white';
+}
+
+function renderToday() {
+  const el=document.getElementById('content');
+  const dow=todayDow();
+  const tasks=myTasks.filter(t=>t.day_of_week===null||t.day_of_week===dow);
+  const doneSet=new Set(todayC.map(c=>c.task_id));
+  const done=tasks.filter(t=>doneSet.has(t.id)).length, total=tasks.length;
+  updateHeader(done,total);
+
+  let rows='';
+  tasks.forEach(t=>{
+    const isDone=doneSet.has(t.id), isDaySpec=t.day_of_week!==null;
+    const dayLabel=isDaySpec?`<span class="day-badge">${t.day_of_week===5?'Freitag':'Samstag'}</span>`:'';
+    rows+=`<div class="task-row ${isDone?'done':''}" onclick="toggle('${t.id}')">
+      <div class="check">${isDone?'✓':''}</div>
+      <span class="task-label">${t.text}</span>
+      ${dayLabel}
+    </div>`;
+  });
+
+  let allDoneHtml='';
+  if(done===total&&total>0) {
+    allDoneHtml=`<div class="all-done"><div class="trophy">🏆</div><h2>Super gemacht!</h2><p>Alle Aufgaben erledigt. Du hast dir Freizeit verdient!</p></div>`;
+  }
+
+  el.innerHTML=`
+    ${allDoneHtml}
+    <div class="section-label">Aufgaben heute</div>
+    <div class="task-list-wrap"><div class="task-card">${rows||'<div style="padding:20px;text-align:center;color:var(--text-2);font-size:.9rem">Keine Aufgaben heute</div>'}</div></div>`;
+}
+
+function renderWeek(data) {
+  const el=document.getElementById('content');
+  const wd=weekDates(), t0=today();
+  const dow=todayDow();
+  // Only show non-day-specific tasks in week view for clarity
+  const tasks=myTasks.filter(t=>t.day_of_week===null);
+  const idx={};
+  data.forEach(c=>{ idx[c.task_id+'_'+c.date]=c; });
+
+  const headers=wd.map(d=>{
+    const day=new Date(d+'T12:00:00'), isT=d===t0;
+    return `<th class="${isT?'today-col':''}">${DE_D[day.getDay()]}<br><span style="font-weight:400;font-size:.6rem">${day.getDate()}.${day.getMonth()+1}.</span></th>`;
+  }).join('');
+
+  const trows=tasks.map(t=>{
+    const cells=wd.map(d=>{
+      const c=idx[t.id+'_'+d], fut=d>t0;
+      if(c) return `<td class="week-dot-td"><div class="wdot done">✓</div></td>`;
+      if(fut) return `<td class="week-dot-td"><div class="wdot fut"></div></td>`;
+      return `<td class="week-dot-td"><div class="wdot miss"></div></td>`;
+    }).join('');
+    return `<tr class="week-row-tr"><td class="week-name-td">${t.text}</td>${cells}</tr>`;
+  }).join('');
+
+  el.innerHTML=`
+    <div class="section-label">Verlauf</div>
+    <div class="week-wrap">
+      <div class="week-nav">
+        <button class="week-nav-btn" onclick="changeWeek(-1)">← Zurück</button>
+        <span class="week-label">${weekLabel()}</span>
+        <button class="week-nav-btn" onclick="changeWeek(1)" ${weekOffset>=0?'disabled':''}>Vor →</button>
+      </div>
+      <div class="week-scroll">
+        <table class="week-table">
+          <thead><tr><th></th>${headers}</tr></thead>
+          <tbody>${trows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+async function changeWeek(dir) {
+  if(dir>0&&weekOffset>=0) return;
+  weekOffset+=dir; showLoading(); const d=await loadWeek().catch(()=>[]); renderWeek(d);
+}
+
+function renderNotes() {
+  const el=document.getElementById('content');
+  const rows=notes.map(n=>{
+    const dt=new Date(n.created_at);
+    const dateStr=`${dt.getDate()}.${dt.getMonth()+1}.${dt.getFullYear()} ${dt.getHours().toString().padStart(2,'0')}:${dt.getMinutes().toString().padStart(2,'0')}`;
+    return `<div class="note-row">
+      <div style="flex:1"><div class="note-text">${n.text}</div><div class="note-date">${dateStr}</div></div>
+      <button class="note-del" onclick="deleteNote('${n.id}')">✕</button>
+    </div>`;
+  }).join('');
+
+  el.innerHTML=`
+    <div class="section-label">Meine Notizen</div>
+    <div class="add-note-wrap">
+      <div class="add-note-row">
+        <input class="add-note-input" id="noteInput" type="text" placeholder="Neue Notiz …" maxlength="200">
+        <button class="add-note-btn" onclick="addNote()">+ Add</button>
+      </div>
+    </div>
+    ${notes.length>0
+      ? `<div class="notes-wrap"><div class="note-card">${rows}</div></div>`
+      : `<div class="notes-wrap"><div class="empty-notes">Noch keine Notizen.<br>Schreib etwas!</div></div>`
+    }`;
+
+  const inp=document.getElementById('noteInput');
+  if(inp) inp.addEventListener('keydown',e=>{ if(e.key==='Enter') addNote(); });
+}
+
+async function init() {
+  document.getElementById('headerDate').textContent=fmtDate(new Date());
+  try {
+    await loadMyTasks();
+    await loadToday();
+    renderToday();
+  } catch(e) {
+    document.getElementById('content').innerHTML='<div class="loading"><span style="font-size:2rem">⚠️</span><span>Verbindungsfehler</span></div>';
+  }
+}
+init();
+</script>
+</body>
+</html>
