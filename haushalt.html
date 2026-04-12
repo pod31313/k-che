@@ -440,7 +440,7 @@ function renderToday(){
   });
   el.innerHTML=`${listToggleHTML()}
     <div class="progress-wrap">
-      <div class="progress-meta"><span><strong>${done}</strong> von ${total} erledigt</span><span>${pct}%</span></div>
+      <div class="progress-meta"><span><strong>${handled}</strong> von ${total} erledigt</span><span>${pct}%</span></div>
       <div class="pbar-bg"><div class="pbar-fill" style="width:${pct}%;background:${barColor}"></div></div>
     </div>
     <div class="section-label"><span>Aufgaben heute</span><button class="section-label-btn" onclick="openAddTask()">+ Aufgabe</button></div>
