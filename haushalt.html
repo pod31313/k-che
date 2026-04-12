@@ -70,6 +70,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI'
 .task-row:active { background: var(--gray-light); }
 .check { width: 27px; height: 27px; border-radius: 50%; border: 2px solid var(--gray-mid); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; color: white; transition: all .15s; }
 .task-row.done .check { background: var(--green); border-color: var(--green); }
+.task-row.skip .check { background: #007AFF22; border-color: #007AFF88; color: #007AFF; font-size: 1rem; }
+.task-row.skip .task-label { color: var(--text-2); }
+.task-badge.skip-badge { background: #007AFF18; color: #007AFF; letter-spacing: .04em; }
 .task-label { flex: 1; font-size: 0.95rem; line-height: 1.3; }
 .task-row.done .task-label { color: var(--text-2); }
 .task-badge { font-size: 0.72rem; font-weight: 700; padding: 3px 9px; border-radius: 99px; background: var(--gray-light); color: var(--text-2); }
@@ -87,6 +90,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI'
 .kinder-task:active { background: var(--gray-light); }
 .kinder-check { width: 18px; height: 18px; border-radius: 4px; border: 2px solid var(--gray-mid); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 0.62rem; color: white; margin-top: 1px; transition: all .15s; }
 .kinder-task.done .kinder-check { background: var(--green); border-color: var(--green); }
+.kinder-task.skip .kinder-check { background: #007AFF22; border-color: #007AFF88; color: #007AFF; font-size: 0.75rem; border-radius: 50%; }
+.kinder-task.skip .kinder-label { color: var(--text-2); }
 .kinder-label { font-size: 0.71rem; line-height: 1.3; color: var(--text); }
 .kinder-task.done .kinder-label { color: var(--text-2); text-decoration: line-through; }
 .kinder-day-badge { font-size: 0.6rem; display: block; color: var(--orange); font-weight: 600; margin-top: 1px; }
@@ -139,6 +144,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI'
 .wdot.miss { background: var(--gray-light); }
 .wdot.fut  { background: transparent; }
 .wdot.na   { background: transparent; }
+.wdot-skip { background: #007AFF18; color: #007AFF; font-size: 0.9rem; }
+.wdot-skip-mini { background: #007AFF18; color: #007AFF; font-size: 0.72rem; }
 
 /* ── STATS VIEW ── */
 .stats-wrap { padding: 0 14px 8px; }
@@ -318,13 +325,23 @@ async function loadStats() {
 async function toggle(taskId) {
   if(!user){document.getElementById('overlayUser').style.display='flex';return;}
   const existing = todayC.find(c=>c.task_id===taskId);
-  if(existing){ todayC=todayC.filter(c=>c.id!==existing.id); }
-  else { todayC.push({id:'_tmp',task_id:taskId,date:today(),done_by:user}); }
+  // 3-state cycle: leer → done → skip → leer
+  let newStatus = null;
+  if(!existing)                     newStatus = 'done';
+  else if(existing.status==='done') newStatus = 'skip';
+  // skip → leer: newStatus bleibt null (löschen)
+
+  // Optimistic update
+  todayC = todayC.filter(c=>c.task_id!==taskId);
+  if(newStatus) todayC.push({id:'_tmp',task_id:taskId,date:today(),done_by:user,status:newStatus});
+
   if(currentList==='kinder') renderKinder();
   else renderToday();
-  if(existing){ await db.from('completions').delete().eq('id',existing.id); }
-  else {
-    const {data}=await db.from('completions').insert({task_id:taskId,date:today(),done_by:user}).select().single();
+
+  // DB sync
+  if(existing) await db.from('completions').delete().eq('id',existing.id);
+  if(newStatus){
+    const {data}=await db.from('completions').insert({task_id:taskId,date:today(),done_by:user,status:newStatus}).select().single();
     if(data){ todayC=todayC.filter(c=>c.id!=='_tmp'); todayC.push(data); }
   }
 }
@@ -406,17 +423,19 @@ function showLoading(){ document.getElementById('content').innerHTML='<div class
 function renderToday(){
   const el=document.getElementById('content');
   const tasks=filteredTasks();
-  const doneSet=new Set(todayC.map(c=>c.task_id));
-  const done=tasks.filter(t=>doneSet.has(t.id)).length, total=tasks.length;
-  const pct=total?Math.round(done/total*100):0;
+  const handledSet=new Set(todayC.map(c=>c.task_id));
+  const handled=tasks.filter(t=>handledSet.has(t.id)).length, total=tasks.length;
+  const pct=total?Math.round(handled/total*100):0;
   const barColor=currentList==='abend'?'var(--purple)':'var(--green)';
   let rows='';
   tasks.forEach(t=>{
-    const c=todayC.find(x=>x.task_id===t.id), isDone=!!c;
-    rows+=`<div class="task-row ${isDone?'done':''}" onclick="toggle('${t.id}')">
-      <div class="check">${isDone?'✓':''}</div>
+    const c=todayC.find(x=>x.task_id===t.id);
+    const isDone=c&&c.status==='done', isSkip=c&&c.status==='skip';
+    rows+=`<div class="task-row ${isDone?'done':isSkip?'skip':''}" onclick="toggle('${t.id}')">
+      <div class="check">${isDone?'✓':isSkip?'⊘':''}</div>
       <div class="task-label">${t.text}</div>
       ${isDone?`<span class="task-badge ${c.done_by}">${c.done_by}</span>`:''}
+      ${isSkip?`<span class="task-badge skip-badge">–</span>`:''}
     </div>`;
   });
   el.innerHTML=`${listToggleHTML()}
@@ -438,31 +457,32 @@ function renderKinder(){
   const el=document.getElementById('content');
   const dow=todayDow();
   const kinderTasks=allTasks.filter(t=>t.list_name==='kinder');
-  const doneSet=new Set(todayC.map(c=>c.task_id));
+  const handledSet=new Set(todayC.map(c=>c.task_id));
 
-  // Total progress across all children
-  const allChildTasks=kinderTasks.filter(t=>t.day_of_week===null||t.day_of_week===null||t.day_of_week===dow);
-  const totalDone=allChildTasks.filter(t=>doneSet.has(t.id)).length;
+  // Total progress across all children (done + skip = handled)
+  const allChildTasks=kinderTasks.filter(t=>t.day_of_week===null||t.day_of_week===dow);
+  const totalDone=allChildTasks.filter(t=>handledSet.has(t.id)).length;
   const totalAll=allChildTasks.length;
   const pct=totalAll?Math.round(totalDone/totalAll*100):0;
 
   const cols=CHILDREN.map(child=>{
     const color=CHILD_COLORS[child];
     const childTasks=kinderTasks.filter(t=>t.child_name===child&&(t.day_of_week===null||t.day_of_week===dow));
-    const doneCnt=childTasks.filter(t=>doneSet.has(t.id)).length;
+    const handledCnt=childTasks.filter(t=>handledSet.has(t.id)).length;
     const totalCnt=childTasks.length;
     const taskRows=childTasks.map(t=>{
-      const isDone=doneSet.has(t.id);
+      const c=todayC.find(x=>x.task_id===t.id);
+      const isDone=c&&c.status==='done', isSkip=c&&c.status==='skip';
       const isDaySpec=t.day_of_week!==null;
-      return `<div class="kinder-task ${isDone?'done':''}" onclick="toggle('${t.id}')">
-        <div class="kinder-check">${isDone?'✓':''}</div>
+      return `<div class="kinder-task ${isDone?'done':isSkip?'skip':''}" onclick="toggle('${t.id}')">
+        <div class="kinder-check">${isDone?'✓':isSkip?'⊘':''}</div>
         <div><span class="kinder-label">${t.text}</span>${isDaySpec?`<span class="kinder-day-badge">${t.day_of_week===5?'Fr':'Sa'}</span>`:''}</div>
       </div>`;
     }).join('');
     return `<div class="kinder-col">
       <div class="kinder-header" style="border-color:${color};background:${color}18">
         <span class="kinder-name" style="color:${color}">${child}</span>
-        <span class="kinder-count" style="color:${color}">${doneCnt}/${totalCnt}</span>
+        <span class="kinder-count" style="color:${color}">${handledCnt}/${totalCnt}</span>
       </div>
       ${taskRows||'<div style="padding:10px;font-size:.72rem;color:var(--text-2);text-align:center">–</div>'}
     </div>`;
@@ -509,6 +529,7 @@ function renderWeek(data){
           const tid=entry[child];
           if(!tid) return `<div class="wdot-mini skip">–</div>`;
           const c=allIdx[tid+'_'+d], fut=d>t0;
+          if(c&&c.status==='skip') return `<div class="wdot-mini wdot-skip-mini">⊘</div>`;
           if(c) return `<div class="wdot-mini ${c.done_by}">${c.done_by}</div>`;
           if(fut) return `<div class="wdot-mini fut"></div>`;
           return `<div class="wdot-mini miss"></div>`;
@@ -522,6 +543,7 @@ function renderWeek(data){
     trows=tasks.map(t=>{
       const cells=wd.map(d=>{
         const c=allIdx[t.id+'_'+d], fut=d>t0;
+        if(c&&c.status==='skip') return `<td class="week-dot-td"><div class="wdot wdot-skip">⊘</div></td>`;
         if(c) return `<td class="week-dot-td"><div class="wdot ${c.done_by}">${c.done_by}</div></td>`;
         if(fut) return `<td class="week-dot-td"><div class="wdot fut"></div></td>`;
         return `<td class="week-dot-td"><div class="wdot miss"></div></td>`;
@@ -533,6 +555,7 @@ function renderWeek(data){
     trows=tasks.map(t=>{
       const cells=wd.map(d=>{
         const c=allIdx[t.id+'_'+d], fut=d>t0;
+        if(c&&c.status==='skip') return `<td class="week-dot-td"><div class="wdot wdot-skip">⊘</div></td>`;
         if(c) return `<td class="week-dot-td"><div class="wdot ${c.done_by}">${c.done_by}</div></td>`;
         if(fut) return `<td class="week-dot-td"><div class="wdot fut"></div></td>`;
         return `<td class="week-dot-td"><div class="wdot miss"></div></td>`;
@@ -568,6 +591,7 @@ function renderWeek(data){
         <div class="leg"><div class="leg-dot" style="background:#007AFF33"></div>E erledigt</div>
         <div class="leg"><div class="leg-dot" style="background:#34C75933"></div>B erledigt</div>
         <div class="leg"><div class="leg-dot" style="background:var(--gray-mid)"></div>Offen</div>
+        <div class="leg"><span style="color:#007AFF;font-size:.85rem;line-height:1">⊘</span> nicht nötig</div>
       </div>
       <div class="week-scroll">
         <table class="week-table">
