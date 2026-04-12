@@ -15,6 +15,7 @@
   --red:        #FF3B30;
   --orange:     #FF9500;
   --purple:     #AF52DE;
+  --teal:       #30B0C7;
   --gray:       #8E8E93;
   --gray-light: #F2F2F7;
   --gray-mid:   #E5E5EA;
@@ -32,26 +33,20 @@ html, body { height: 100%; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); overflow-x: hidden; }
 
 /* ── TOPBAR ── */
-.topbar {
-  position: sticky; top: 0; z-index: 100;
-  background: rgba(255,255,255,0.92);
-  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--border);
-  padding: calc(var(--safe-t) + 10px) 18px 10px;
-  display: flex; align-items: center; justify-content: space-between;
-}
+.topbar { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: calc(var(--safe-t) + 10px) 18px 10px; display: flex; align-items: center; justify-content: space-between; }
 .topbar-left h1 { font-size: 1.05rem; font-weight: 700; line-height: 1.2; }
 .topbar-left .date { font-size: 0.78rem; color: var(--text-2); margin-top: 1px; }
 .person-toggle { display: flex; background: var(--gray-light); border-radius: 9px; padding: 3px; gap: 2px; }
 .person-btn { padding: 7px 18px; border-radius: 7px; font-size: 0.95rem; font-weight: 700; border: none; cursor: pointer; background: transparent; color: var(--gray); transition: all .15s; }
 .person-btn.active { background: var(--card); color: var(--text); box-shadow: 0 1px 5px rgba(0,0,0,0.15); }
 
-/* ── LIST TOGGLE ── */
-.list-toggle { display: flex; background: var(--gray-light); border-radius: 10px; padding: 3px; margin: 12px 16px 0; }
-.list-btn { flex: 1; padding: 9px 8px; border-radius: 8px; font-size: 0.88rem; font-weight: 600; border: none; cursor: pointer; background: transparent; color: var(--gray); transition: all .15s; }
+/* ── LIST TOGGLE (4 options) ── */
+.list-toggle { display: flex; background: var(--gray-light); border-radius: 10px; padding: 3px; margin: 10px 14px 0; gap: 2px; }
+.list-btn { flex: 1; padding: 8px 4px; border-radius: 8px; font-size: 0.75rem; font-weight: 600; border: none; cursor: pointer; background: transparent; color: var(--gray); transition: all .15s; text-align: center; line-height: 1.2; }
 .list-btn.active { background: var(--card); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
 .list-btn.haushalt.active { color: var(--blue); }
-.list-btn.abend.active   { color: var(--purple); }
+.list-btn.kinder.active   { color: var(--green); }
+.list-btn.abend.active    { color: var(--purple); }
 
 /* ── CONTENT ── */
 .content { padding-bottom: calc(58px + var(--safe-b) + 20px); min-height: 80vh; }
@@ -64,7 +59,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI'
 .pbar-fill { height: 100%; border-radius: 99px; transition: width .35s ease; }
 
 /* ── SECTION LABEL ── */
-.section-label { font-size: 0.74rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-2); padding: 14px 18px 6px; display: flex; align-items: center; justify-content: space-between; }
+.section-label { font-size: 0.74rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-2); padding: 12px 18px 6px; display: flex; align-items: center; justify-content: space-between; }
 .section-label-btn { font-size: 0.78rem; font-weight: 600; color: var(--blue); background: none; border: none; cursor: pointer; padding: 0; text-transform: none; letter-spacing: 0; }
 
 /* ── TASK LIST ── */
@@ -81,6 +76,26 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI'
 .task-badge.E { background: #007AFF18; color: var(--blue); }
 .task-badge.B { background: #34C75918; color: var(--green); }
 
+/* ── KINDER GRID ── */
+.kinder-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 0 14px 8px; }
+.kinder-col { background: var(--card); border-radius: var(--r); overflow: hidden; }
+.kinder-header { padding: 9px 8px 8px; border-bottom: 2px solid; text-align: center; }
+.kinder-name { font-size: 0.82rem; font-weight: 700; display: block; }
+.kinder-count { font-size: 0.68rem; font-weight: 500; opacity: 0.7; display: block; margin-top: 1px; }
+.kinder-task { display: flex; align-items: flex-start; gap: 6px; padding: 7px 8px; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; transition: background .1s; }
+.kinder-task:last-child { border-bottom: none; }
+.kinder-task:active { background: var(--gray-light); }
+.kinder-check { width: 18px; height: 18px; border-radius: 4px; border: 2px solid var(--gray-mid); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 0.62rem; color: white; margin-top: 1px; transition: all .15s; }
+.kinder-task.done .kinder-check { background: var(--green); border-color: var(--green); }
+.kinder-label { font-size: 0.71rem; line-height: 1.3; color: var(--text); }
+.kinder-task.done .kinder-label { color: var(--text-2); text-decoration: line-through; }
+.kinder-day-badge { font-size: 0.6rem; display: block; color: var(--orange); font-weight: 600; margin-top: 1px; }
+
+/* ── KINDER WEEK CHILD SELECTOR ── */
+.child-selector { display: flex; gap: 6px; padding: 4px 4px 10px; }
+.child-btn { flex: 1; padding: 7px 4px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--card); font-size: 0.78rem; font-weight: 600; cursor: pointer; text-align: center; transition: all .15s; color: var(--gray); }
+.child-btn.active { color: white; border-color: transparent; }
+
 /* ── BOTTOM NAV ── */
 .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,0.94); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid var(--border); display: flex; padding-bottom: var(--safe-b); z-index: 100; }
 .nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 9px 4px; border: none; background: transparent; cursor: pointer; gap: 2px; color: var(--gray); font-size: 0.62rem; font-weight: 500; transition: color .15s; }
@@ -89,8 +104,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI'
 
 /* ── WEEK VIEW ── */
 .week-wrap { padding: 0 14px 8px; }
-.week-nav { display: flex; align-items: center; justify-content: space-between; padding: 4px 4px 12px; gap: 8px; }
-.week-nav-btn { padding: 7px 14px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--card); font-size: 0.82rem; font-weight: 600; color: var(--blue); cursor: pointer; transition: all .15s; }
+.week-nav { display: flex; align-items: center; justify-content: space-between; padding: 4px 4px 10px; }
+.week-nav-btn { padding: 7px 14px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--card); font-size: 0.82rem; font-weight: 600; color: var(--blue); cursor: pointer; }
 .week-nav-btn:disabled { color: var(--gray); border-color: var(--gray-light); cursor: default; }
 .week-nav-btn:active:not(:disabled) { background: var(--gray-light); }
 .week-label { font-size: 0.8rem; font-weight: 600; color: var(--text); text-align: center; flex: 1; }
@@ -112,40 +127,39 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI'
 .wdot.B { background: #34C75922; color: var(--green); }
 .wdot.miss { background: var(--gray-light); }
 .wdot.fut  { background: transparent; }
-.wdot.we   { background: #FF950012; }
+.wdot.na   { background: transparent; }
 
 /* ── STATS VIEW ── */
 .stats-wrap { padding: 0 14px 8px; }
 .period-row { display: flex; gap: 8px; padding: 6px 4px 12px; }
-.period-chip { padding: 6px 16px; border-radius: 99px; font-size: 0.82rem; font-weight: 500; border: 1.5px solid var(--border); background: var(--card); color: var(--text-2); cursor: pointer; transition: all .15s; }
+.period-chip { padding: 6px 16px; border-radius: 99px; font-size: 0.82rem; font-weight: 500; border: 1.5px solid var(--border); background: var(--card); color: var(--text-2); cursor: pointer; }
 .period-chip.active { background: var(--blue); border-color: var(--blue); color: #fff; }
-.stats-card { background: var(--card); border-radius: var(--r); overflow: hidden; }
+.stats-group-label { font-size: 0.8rem; font-weight: 700; padding: 12px 4px 6px; }
+.stats-card { background: var(--card); border-radius: var(--r); overflow: hidden; margin-bottom: 10px; }
 .stat-row { padding: 11px 16px; border-bottom: 1px solid var(--border); }
 .stat-row:last-child { border-bottom: none; }
 .stat-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
 .stat-name { font-size: 0.88rem; }
 .stat-pct  { font-size: 0.84rem; font-weight: 700; }
 .stat-bar-bg { background: var(--gray-light); border-radius: 99px; height: 5px; overflow: hidden; }
-.stat-bar-fill { height: 100%; border-radius: 99px; transition: width .4s ease; }
+.stat-bar-fill { height: 100%; border-radius: 99px; }
 .stat-sub { font-size: 0.72rem; color: var(--text-2); margin-top: 4px; }
 
 /* ── SHOPPING ── */
 .shop-wrap { padding: 0 14px 8px; }
 .shop-cat-label { font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-2); padding: 10px 4px 8px; }
 .chips-row { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 4px; }
-.chip { display: inline-flex; align-items: center; gap: 6px; background: var(--card); border: 1.5px solid var(--border); border-radius: 10px; padding: 7px 11px; font-size: 0.85rem; cursor: pointer; transition: all .15s; user-select: none; }
+.chip { display: inline-flex; align-items: center; gap: 6px; background: var(--card); border: 1.5px solid var(--border); border-radius: 10px; padding: 7px 11px; font-size: 0.85rem; cursor: pointer; user-select: none; }
 .chip:active { opacity: .7; }
 .chip.bought { opacity: .4; }
 .chip.bought .chip-text { text-decoration: line-through; }
 .chip-qty { font-weight: 700; font-size: 0.72rem; background: var(--gray-light); color: var(--text-2); padding: 2px 6px; border-radius: 5px; }
-.shop-actions { display: flex; gap: 10px; padding: 12px 4px 6px; }
-.shop-clear-btn { flex: 1; padding: 11px; border-radius: var(--r); border: 1.5px solid var(--border); background: var(--card); font-size: 0.85rem; font-weight: 500; color: var(--text-2); cursor: pointer; }
-.shop-clear-btn:active { background: var(--gray-light); }
-.add-item-row { display: flex; gap: 8px; padding: 4px 4px 4px; }
-.add-item-input { flex: 1; border: 1.5px solid var(--border); border-radius: 10px; padding: 10px 14px; font-size: 0.9rem; background: var(--card); color: var(--text); font-family: inherit; outline: none; transition: border-color .15s; }
+.shop-actions { padding: 12px 4px 6px; }
+.shop-clear-btn { width: 100%; padding: 11px; border-radius: var(--r); border: 1.5px solid var(--border); background: var(--card); font-size: 0.85rem; font-weight: 500; color: var(--text-2); cursor: pointer; }
+.add-item-row { display: flex; gap: 8px; padding: 4px; }
+.add-item-input { flex: 1; border: 1.5px solid var(--border); border-radius: 10px; padding: 10px 14px; font-size: 0.9rem; background: var(--card); color: var(--text); font-family: inherit; outline: none; }
 .add-item-input:focus { border-color: var(--blue); }
-.add-item-btn { background: var(--blue); color: #fff; border: none; border-radius: 10px; padding: 10px 16px; font-size: 0.9rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
-.add-item-btn:active { opacity: .8; }
+.add-item-btn { background: var(--blue); color: #fff; border: none; border-radius: 10px; padding: 10px 16px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
 .qty-cat-row { display: flex; gap: 8px; padding: 0 4px 8px; }
 .small-select { flex: 1; border: 1.5px solid var(--border); border-radius: 10px; padding: 9px 10px; font-size: 0.82rem; background: var(--card); color: var(--text); font-family: inherit; outline: none; -webkit-appearance: none; }
 
@@ -154,7 +168,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI'
 .spin { width: 30px; height: 30px; border-radius: 50%; border: 3px solid var(--gray-mid); border-top-color: var(--blue); animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── SHEETS / OVERLAYS ── */
+/* ── OVERLAYS / SHEETS ── */
 .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: flex-end; z-index: 200; }
 .sheet { background: var(--card); border-radius: 22px 22px 0 0; padding: 26px 22px calc(24px + var(--safe-b)); width: 100%; animation: slideUp .25s ease; }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
@@ -166,12 +180,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI'
 .user-btn .initials { font-size: 2rem; font-weight: 800; }
 .user-btn .name { font-size: 0.85rem; font-weight: 500; color: var(--text); }
 .sheet-form { display: flex; flex-direction: column; gap: 10px; }
-.sheet-input { border: 1.5px solid var(--border); border-radius: 12px; padding: 13px 16px; font-size: 1rem; font-family: inherit; color: var(--text); outline: none; transition: border-color .15s; background: var(--gray-light); }
+.sheet-input { border: 1.5px solid var(--border); border-radius: 12px; padding: 13px 16px; font-size: 1rem; font-family: inherit; color: var(--text); outline: none; background: var(--gray-light); }
 .sheet-input:focus { border-color: var(--blue); background: #fff; }
 .sheet-submit { background: var(--blue); color: #fff; border: none; border-radius: 12px; padding: 14px; font-size: 1rem; font-weight: 600; cursor: pointer; margin-top: 4px; }
-.sheet-submit:active { opacity: .8; }
 .sheet-cancel { background: var(--gray-light); color: var(--text-2); border: none; border-radius: 12px; padding: 13px; font-size: 0.95rem; font-weight: 500; cursor: pointer; }
-.sheet-cancel:active { opacity: .7; }
 </style>
 </head>
 <body>
@@ -190,7 +202,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI'
 
 <!-- Aufgabe hinzufügen -->
 <div class="overlay" id="overlayTask" style="display:none" onclick="closeTaskSheet(event)">
-  <div class="sheet" id="taskSheet">
+  <div class="sheet">
     <h2>Neue Aufgabe</h2>
     <p id="taskSheetSub">Wird täglich getrackt.</p>
     <div class="sheet-form">
@@ -238,7 +250,12 @@ let allTasks    = [];
 let todayC      = [];
 let tab         = 'h';
 let period      = 28;
-let weekOffset  = 0;  // 0 = aktuelle Woche, -1 = letzte Woche, etc.
+let weekOffset  = 0;
+let weekChild   = localStorage.getItem('hh_weekChild') || 'Anton';
+
+const CHILDREN = ['Anton', 'Friedrich', 'Justus'];
+const CHILD_COLORS = { Anton: 'var(--blue)', Friedrich: 'var(--orange)', Justus: 'var(--purple)' };
+const CHILD_BG     = { Anton: '#007AFF', Friedrich: '#FF9500', Justus: '#AF52DE' };
 
 const DE_D  = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 const DE_DL = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
@@ -246,11 +263,11 @@ const DE_M  = ['Januar','Februar','März','April','Mai','Juni','Juli','August','
 
 // ── Helpers ───────────────────────────────────────────────
 function today() { return new Date().toISOString().split('T')[0]; }
+function todayDow() { return new Date().getDay(); }
 function fmtDate(d) { return `${DE_DL[d.getDay()]}, ${d.getDate()}. ${DE_M[d.getMonth()]}`; }
 function isWeekend(ds) { const d = ds ? new Date(ds+'T12:00:00') : new Date(); return d.getDay()===0||d.getDay()===6; }
 function filteredTasks() { return allTasks.filter(t => t.list_name === currentList); }
 
-// Get 7-day week (Mon–Sun) with offset
 function weekDates(offset) {
   const off = offset !== undefined ? offset : weekOffset;
   const now = new Date(), dow = now.getDay();
@@ -260,16 +277,15 @@ function weekDates(offset) {
     const d = new Date(mon); d.setDate(mon.getDate()+i); return d.toISOString().split('T')[0];
   });
 }
-
 function weekLabel(offset) {
   const wd = weekDates(offset);
   const s = new Date(wd[0]+'T12:00:00'), e = new Date(wd[6]+'T12:00:00');
   return `${s.getDate()}.${s.getMonth()+1}. – ${e.getDate()}.${e.getMonth()+1}.${e.getFullYear()}`;
 }
 
-// ── Supabase: Tasks ───────────────────────────────────────
+// ── Supabase ──────────────────────────────────────────────
 async function loadTasks() {
-  const {data,error} = await db.from('tasks').select('*').eq('active',true).order('list_name').order('sort_order');
+  const {data,error} = await db.from('tasks').select('*').eq('active',true).order('list_name').order('child_name').order('sort_order');
   if(error) throw error; allTasks = data||[];
 }
 async function loadToday() {
@@ -291,12 +307,13 @@ async function loadStats() {
 async function toggle(taskId) {
   if(!user){document.getElementById('overlayUser').style.display='flex';return;}
   const existing = todayC.find(c=>c.task_id===taskId);
-  if(existing) { todayC=todayC.filter(c=>c.id!==existing.id); }
+  if(existing){ todayC=todayC.filter(c=>c.id!==existing.id); }
   else { todayC.push({id:'_tmp',task_id:taskId,date:today(),done_by:user}); }
-  renderToday();
-  if(existing) { await db.from('completions').delete().eq('id',existing.id); }
+  if(currentList==='kinder') renderKinder();
+  else renderToday();
+  if(existing){ await db.from('completions').delete().eq('id',existing.id); }
   else {
-    const {data} = await db.from('completions').insert({task_id:taskId,date:today(),done_by:user}).select().single();
+    const {data}=await db.from('completions').insert({task_id:taskId,date:today(),done_by:user}).select().single();
     if(data){ todayC=todayC.filter(c=>c.id!=='_tmp'); todayC.push(data); }
   }
 }
@@ -305,13 +322,13 @@ async function submitNewTask() {
   const input = document.getElementById('newTaskInput');
   const text = input.value.trim(); if(!text) return;
   const tasks = filteredTasks();
-  const maxOrder = tasks.length ? Math.max(...tasks.map(t=>t.sort_order))+1 : 1;
+  const maxOrder = tasks.length ? Math.max(...tasks.map(t=>t.sort_order||0))+1 : 1;
   const {data,error} = await db.from('tasks').insert({text,sort_order:maxOrder,active:true,list_name:currentList}).select().single();
   if(!error&&data){ allTasks.push(data); input.value=''; document.getElementById('overlayTask').style.display='none'; if(tab==='h') renderToday(); }
 }
 function closeTaskSheet(e){ if(e.target===document.getElementById('overlayTask')) document.getElementById('overlayTask').style.display='none'; }
 
-// ── Supabase: Shopping ────────────────────────────────────
+// Shopping
 async function loadShopping() {
   const {data,error}=await db.from('shopping_items').select('*').order('created_at');
   if(error) throw error; return data||[];
@@ -334,51 +351,55 @@ async function clearBought() {
 }
 
 // ── User ──────────────────────────────────────────────────
-function selectUser(u){ user=u; localStorage.setItem('hh_user',u); document.getElementById('overlayUser').style.display='none'; refreshToggle(); if(tab==='h') renderToday(); }
-function switchUser(u){ user=u; localStorage.setItem('hh_user',u); refreshToggle(); if(tab==='h') renderToday(); }
+function selectUser(u){ user=u; localStorage.setItem('hh_user',u); document.getElementById('overlayUser').style.display='none'; refreshToggle(); renderCurrentTab(); }
+function switchUser(u){ user=u; localStorage.setItem('hh_user',u); refreshToggle(); renderCurrentTab(); }
 function refreshToggle(){ document.getElementById('btnE').classList.toggle('active',user==='E'); document.getElementById('btnB').classList.toggle('active',user==='B'); }
 
-// ── List switching ────────────────────────────────────────
+// ── List ──────────────────────────────────────────────────
 function setList(list) {
-  currentList = list; localStorage.setItem('hh_list',list);
-  if(tab==='h') renderToday();
-  else if(tab==='w') { showLoading(); loadWeek().then(d=>renderWeek(d)); }
-  else if(tab==='s') { showLoading(); loadStats().then(d=>renderStats(d)); }
+  currentList=list; localStorage.setItem('hh_list',list);
+  renderCurrentTab();
 }
 
 function listToggleHTML() {
   return `<div class="list-toggle">
-    <button class="list-btn haushalt ${currentList==='haushalt'?'active':''}" onclick="setList('haushalt')">🏠 Haushalt</button>
-    <button class="list-btn abend ${currentList==='abend'?'active':''}" onclick="setList('abend')">🌙 Abend</button>
+    <button class="list-btn haushalt ${currentList==='haushalt'?'active':''}" onclick="setList('haushalt')">🏠<br>Haushalt</button>
+    <button class="list-btn kinder  ${currentList==='kinder'  ?'active':''}" onclick="setList('kinder')">👦<br>Kinder</button>
+    <button class="list-btn abend   ${currentList==='abend'   ?'active':''}" onclick="setList('abend')">🌙<br>Abend</button>
   </div>`;
 }
 
 // ── Tabs ──────────────────────────────────────────────────
-function setTab(t) {
+function setTab(t){
   tab=t;
   ['H','W','E','S'].forEach(x=>document.getElementById('nav'+x).classList.remove('active'));
   document.getElementById('nav'+t.toUpperCase()).classList.add('active');
   renderTab();
 }
-async function renderTab() {
-  if(tab==='h'){ renderToday(); }
-  else if(tab==='w'){ showLoading(); const d=await loadWeek().catch(()=>[]); renderWeek(d); }
-  else if(tab==='e'){ showLoading(); const d=await loadShopping().catch(()=>[]); window._shopItems=d; renderShop(d); }
-  else { showLoading(); const d=await loadStats().catch(()=>[]); renderStats(d); }
+function renderCurrentTab(){ renderTab(); }
+async function renderTab(){
+  if(tab==='h'){
+    if(currentList==='kinder') renderKinder();
+    else renderToday();
+  } else if(tab==='w'){
+    showLoading(); const d=await loadWeek().catch(()=>[]); renderWeek(d);
+  } else if(tab==='e'){
+    showLoading(); const d=await loadShopping().catch(()=>[]); window._shopItems=d; renderShop(d);
+  } else {
+    showLoading(); const d=await loadStats().catch(()=>[]); renderStats(d);
+  }
 }
 function showLoading(){ document.getElementById('content').innerHTML='<div class="loading"><div class="spin"></div></div>'; }
 
-// ── Render: Heute ─────────────────────────────────────────
-function renderToday() {
-  const el = document.getElementById('content');
-  const tasks = filteredTasks();
-  const doneSet = new Set(todayC.map(c=>c.task_id));
-  const done = tasks.filter(t=>doneSet.has(t.id)).length;
-  const total = tasks.length;
-  const pct = total ? Math.round(done/total*100) : 0;
-  const barColor = currentList==='abend' ? 'var(--purple)' : 'var(--green)';
-
-  let rows = '';
+// ── Render: Heute (Haushalt / Abend) ──────────────────────
+function renderToday(){
+  const el=document.getElementById('content');
+  const tasks=filteredTasks();
+  const doneSet=new Set(todayC.map(c=>c.task_id));
+  const done=tasks.filter(t=>doneSet.has(t.id)).length, total=tasks.length;
+  const pct=total?Math.round(done/total*100):0;
+  const barColor=currentList==='abend'?'var(--purple)':'var(--green)';
+  let rows='';
   tasks.forEach(t=>{
     const c=todayC.find(x=>x.task_id===t.id), isDone=!!c;
     rows+=`<div class="task-row ${isDone?'done':''}" onclick="toggle('${t.id}')">
@@ -387,97 +408,144 @@ function renderToday() {
       ${isDone?`<span class="task-badge ${c.done_by}">${c.done_by}</span>`:''}
     </div>`;
   });
-
-  el.innerHTML = `
-    ${listToggleHTML()}
+  el.innerHTML=`${listToggleHTML()}
     <div class="progress-wrap">
       <div class="progress-meta"><span><strong>${done}</strong> von ${total} erledigt</span><span>${pct}%</span></div>
       <div class="pbar-bg"><div class="pbar-fill" style="width:${pct}%;background:${barColor}"></div></div>
     </div>
-    <div class="section-label">
-      <span>Aufgaben heute</span>
-      <button class="section-label-btn" onclick="openAddTask()">+ Aufgabe</button>
-    </div>
-    <div class="task-list-wrap"><div class="task-card">${rows||'<div style="padding:20px;text-align:center;color:var(--text-2);font-size:0.9rem">Keine Aufgaben</div>'}</div></div>`;
+    <div class="section-label"><span>Aufgaben heute</span><button class="section-label-btn" onclick="openAddTask()">+ Aufgabe</button></div>
+    <div class="task-list-wrap"><div class="task-card">${rows||'<div style="padding:20px;text-align:center;color:var(--text-2);font-size:.9rem">Keine Aufgaben</div>'}</div></div>`;
 }
 
-function openAddTask() {
-  document.getElementById('taskSheetSub').textContent = `Zur Liste „${currentList==='abend'?'Abend':'Haushalt'}" hinzufügen.`;
+function openAddTask(){
+  document.getElementById('taskSheetSub').textContent=`Zur Liste „${currentList==='abend'?'Abend':'Haushalt'}" hinzufügen.`;
   document.getElementById('overlayTask').style.display='flex';
 }
 
-// ── Render: Woche ─────────────────────────────────────────
-function renderWeek(data) {
-  const el = document.getElementById('content');
-  const wd = weekDates();
-  const t0 = today();
-  const tasks = filteredTasks();
-  const taskIds = new Set(tasks.map(t=>t.id));
+// ── Render: Kinder ────────────────────────────────────────
+function renderKinder(){
+  const el=document.getElementById('content');
+  const dow=todayDow();
+  const kinderTasks=allTasks.filter(t=>t.list_name==='kinder');
+  const doneSet=new Set(todayC.map(c=>c.task_id));
 
-  const idx={};
-  data.filter(c=>taskIds.has(c.task_id)).forEach(c=>{ idx[c.task_id+'_'+c.date]=c; });
+  // Total progress across all children
+  const allChildTasks=kinderTasks.filter(t=>t.day_of_week===null||t.day_of_week===null||t.day_of_week===dow);
+  const totalDone=allChildTasks.filter(t=>doneSet.has(t.id)).length;
+  const totalAll=allChildTasks.length;
+  const pct=totalAll?Math.round(totalDone/totalAll*100):0;
 
-  const headers = wd.map(d=>{
-    const day=new Date(d+'T12:00:00'), isT=d===t0, isWe=isWeekend(d);
-    const cls = isT?'today-col':isWe?'weekend-col':'';
-    return `<th class="${cls}">${DE_D[day.getDay()]}<br><span style="font-weight:400;font-size:.6rem">${day.getDate()}.${day.getMonth()+1}.</span></th>`;
+  const cols=CHILDREN.map(child=>{
+    const color=CHILD_COLORS[child];
+    const childTasks=kinderTasks.filter(t=>t.child_name===child&&(t.day_of_week===null||t.day_of_week===dow));
+    const doneCnt=childTasks.filter(t=>doneSet.has(t.id)).length;
+    const totalCnt=childTasks.length;
+    const taskRows=childTasks.map(t=>{
+      const isDone=doneSet.has(t.id);
+      const isDaySpec=t.day_of_week!==null;
+      return `<div class="kinder-task ${isDone?'done':''}" onclick="toggle('${t.id}')">
+        <div class="kinder-check">${isDone?'✓':''}</div>
+        <div><span class="kinder-label">${t.text}</span>${isDaySpec?`<span class="kinder-day-badge">${t.day_of_week===5?'Fr':'Sa'}</span>`:''}</div>
+      </div>`;
+    }).join('');
+    return `<div class="kinder-col">
+      <div class="kinder-header" style="border-color:${color};background:${color}18">
+        <span class="kinder-name" style="color:${color}">${child}</span>
+        <span class="kinder-count" style="color:${color}">${doneCnt}/${totalCnt}</span>
+      </div>
+      ${taskRows||'<div style="padding:10px;font-size:.72rem;color:var(--text-2);text-align:center">–</div>'}
+    </div>`;
   }).join('');
 
-  const trows = tasks.map(t=>{
-    const cells = wd.map(d=>{
-      const c=idx[t.id+'_'+d], fut=d>t0, we=isWeekend(d);
+  el.innerHTML=`${listToggleHTML()}
+    <div class="progress-wrap">
+      <div class="progress-meta"><span><strong>${totalDone}</strong> von ${totalAll} erledigt</span><span>${pct}%</span></div>
+      <div class="pbar-bg"><div class="pbar-fill" style="width:${pct}%;background:var(--green)"></div></div>
+    </div>
+    <div class="section-label"><span>Kinder vor Freizeit</span></div>
+    <div class="kinder-grid">${cols}</div>`;
+}
+
+// ── Render: Woche ─────────────────────────────────────────
+function renderWeek(data){
+  const el=document.getElementById('content');
+  const wd=weekDates(), t0=today();
+
+  let tasks, idx={};
+  if(currentList==='kinder'){
+    // For kinder: show selected child's tasks
+    tasks=allTasks.filter(t=>t.list_name==='kinder'&&t.child_name===weekChild&&t.day_of_week===null);
+    const taskIds=new Set(tasks.map(t=>t.id));
+    data.filter(c=>taskIds.has(c.task_id)).forEach(c=>{ idx[c.task_id+'_'+c.date]=c; });
+  } else {
+    tasks=filteredTasks();
+    const taskIds=new Set(tasks.map(t=>t.id));
+    data.filter(c=>taskIds.has(c.task_id)).forEach(c=>{ idx[c.task_id+'_'+c.date]=c; });
+  }
+
+  const headers=wd.map(d=>{
+    const day=new Date(d+'T12:00:00'), isT=d===t0, isWe=isWeekend(d);
+    return `<th class="${isT?'today-col':isWe?'weekend-col':''}">${DE_D[day.getDay()]}<br><span style="font-weight:400;font-size:.6rem">${day.getDate()}.${day.getMonth()+1}.</span></th>`;
+  }).join('');
+
+  const trows=tasks.map(t=>{
+    const cells=wd.map(d=>{
+      const c=idx[t.id+'_'+d], fut=d>t0;
       if(c) return `<td class="week-dot-td"><div class="wdot ${c.done_by}">${c.done_by}</div></td>`;
       if(fut) return `<td class="week-dot-td"><div class="wdot fut"></div></td>`;
-      if(we) return `<td class="week-dot-td"><div class="wdot we"></div></td>`;
       return `<td class="week-dot-td"><div class="wdot miss"></div></td>`;
     }).join('');
     return `<tr class="week-row-tr"><td class="week-name-td">${t.text}</td>${cells}</tr>`;
   }).join('');
 
-  const isCurrentWeek = weekOffset >= 0;
+  const childSelector=currentList==='kinder'?`<div class="child-selector">
+    ${CHILDREN.map(c=>`<button class="child-btn ${weekChild===c?'active':''}"
+      style="${weekChild===c?`background:${CHILD_BG[c]}`:'color:var(--text-2)'}"
+      onclick="setWeekChild('${c}')">${c}</button>`).join('')}
+  </div>`:'';
 
-  el.innerHTML = `
-    ${listToggleHTML()}
+  el.innerHTML=`${listToggleHTML()}
     <div class="section-label"><span>Wochenübersicht</span></div>
     <div class="week-wrap">
+      ${childSelector}
       <div class="week-nav">
         <button class="week-nav-btn" onclick="changeWeek(-1)">← Zurück</button>
         <span class="week-label">${weekLabel(weekOffset)}</span>
-        <button class="week-nav-btn" onclick="changeWeek(1)" ${isCurrentWeek?'disabled':''}>Vor →</button>
+        <button class="week-nav-btn" onclick="changeWeek(1)" ${weekOffset>=0?'disabled':''}>Vor →</button>
       </div>
       <div class="week-legend">
         <div class="leg"><div class="leg-dot" style="background:#007AFF33"></div>E erledigt</div>
         <div class="leg"><div class="leg-dot" style="background:#34C75933"></div>B erledigt</div>
-        <div class="leg"><div class="leg-dot" style="background:var(--gray-mid)"></div>Offen/verpasst</div>
+        <div class="leg"><div class="leg-dot" style="background:var(--gray-mid)"></div>Offen</div>
       </div>
       <div class="week-scroll">
         <table class="week-table">
           <thead><tr><th></th>${headers}</tr></thead>
-          <tbody>${trows}</tbody>
+          <tbody>${trows||'<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--text-2);font-size:.85rem">Keine Aufgaben</td></tr>'}</tbody>
         </table>
       </div>
     </div>`;
 }
 
-async function changeWeek(dir) {
-  if(dir > 0 && weekOffset >= 0) return;
-  weekOffset += dir;
-  showLoading();
-  const d = await loadWeek().catch(()=>[]);
-  renderWeek(d);
+async function setWeekChild(child){
+  weekChild=child; localStorage.setItem('hh_weekChild',child);
+  showLoading(); const d=await loadWeek().catch(()=>[]); renderWeek(d);
+}
+async function changeWeek(dir){
+  if(dir>0&&weekOffset>=0) return;
+  weekOffset+=dir; showLoading(); const d=await loadWeek().catch(()=>[]); renderWeek(d);
 }
 
 // ── Render: Shopping ──────────────────────────────────────
-function renderShop(items) {
+function renderShop(items){
   document.getElementById('content').innerHTML=`<div class="section-label"><span>Einkaufsliste</span></div><div class="shop-wrap" id="shopWrap"></div>`;
   renderShopItems(items);
 }
-function renderShopItems(items) {
+function renderShopItems(items){
   window._shopItems=items;
   const wrap=document.getElementById('shopWrap'); if(!wrap) return;
-  const allCats=['Lebensmittel','Haushalt','Sonstiges'];
   let html='';
-  allCats.forEach(cat=>{
+  ['Lebensmittel','Haushalt','Sonstiges'].forEach(cat=>{
     const catItems=items.filter(i=>i.category===cat); if(!catItems.length) return;
     html+=`<div class="shop-cat-label">${cat}</div><div class="chips-row">`;
     catItems.forEach(item=>{ html+=`<div class="chip ${item.bought?'bought':''}" onclick="toggleShop('${item.id}')"><span class="chip-qty">${item.quantity}</span><span class="chip-text">${item.text}</span></div>`; });
@@ -487,7 +555,7 @@ function renderShopItems(items) {
   html+=`<div class="shop-cat-label" style="margin-top:8px">Artikel hinzufügen</div>
     <div class="qty-cat-row">
       <input class="small-select" id="shopQty" type="text" value="1×" placeholder="Menge" style="max-width:80px">
-      <select class="small-select" id="shopCat"><option value="Lebensmittel">Lebensmittel</option><option value="Haushalt">Haushalt</option><option value="Sonstiges">Sonstiges</option></select>
+      <select class="small-select" id="shopCat"><option>Lebensmittel</option><option>Haushalt</option><option>Sonstiges</option></select>
     </div>
     <div class="add-item-row">
       <input class="add-item-input" id="shopText" type="text" placeholder="Artikel …" maxlength="40">
@@ -500,52 +568,63 @@ function renderShopItems(items) {
 }
 
 // ── Render: Auswertung ────────────────────────────────────
-function renderStats(data) {
-  const el = document.getElementById('content');
-  const tasks = filteredTasks();
-  const taskIds = new Set(tasks.map(t=>t.id));
-
-  // Count all days (including weekends now) in period
-  let allDays = Math.min(period, period); // all calendar days
-  // Count only days where tracking makes sense
-  const counts={};
-  tasks.forEach(t=>{ counts[t.id]=0; });
-  data.filter(c=>taskIds.has(c.task_id)).forEach(c=>{ if(counts[c.task_id]!==undefined) counts[c.task_id]++; });
-
-  const sorted=[...tasks].sort((a,b)=>counts[a.id]-counts[b.id]);
-  const rows=sorted.map(t=>{
-    const n=counts[t.id], pct=period?Math.round(n/period*100):0;
-    const col=pct>=80?'#34C759':pct>=50?'#FF9500':'#FF3B30';
-    return `<div class="stat-row">
-      <div class="stat-top"><span class="stat-name">${t.text}</span><span class="stat-pct" style="color:${col}">${pct}%</span></div>
-      <div class="stat-bar-bg"><div class="stat-bar-fill" style="width:${pct}%;background:${col}"></div></div>
-      <div class="stat-sub">${n} von ${period} Tagen erledigt</div>
-    </div>`;
-  }).join('');
-
+function renderStats(data){
+  const el=document.getElementById('content');
   const chips=[7,28,90].map(d=>`<button class="period-chip ${period===d?'active':''}" onclick="changePeriod(${d})">${d===7?'7 Tage':d===28?'4 Wochen':'3 Monate'}</button>`).join('');
-  el.innerHTML=`
-    ${listToggleHTML()}
-    <div class="section-label"><span>Auswertung – Rückblick pro Aufgabe</span></div>
-    <div class="stats-wrap">
-      <div class="period-row">${chips}</div>
-      <div class="stats-card">${rows||'<div style="padding:20px;text-align:center;color:var(--text-2)">Keine Daten</div>'}</div>
-    </div>`;
+
+  let html=`${listToggleHTML()}<div class="section-label"><span>Auswertung</span></div><div class="stats-wrap"><div class="period-row">${chips}</div>`;
+
+  if(currentList==='kinder'){
+    // Group by child
+    CHILDREN.forEach(child=>{
+      const childTasks=allTasks.filter(t=>t.list_name==='kinder'&&t.child_name===child&&t.day_of_week===null);
+      const childIds=new Set(childTasks.map(t=>t.id));
+      const counts={};
+      childTasks.forEach(t=>{counts[t.id]=0;});
+      data.filter(c=>childIds.has(c.task_id)).forEach(c=>{if(counts[c.task_id]!==undefined) counts[c.task_id]++;});
+      const sorted=[...childTasks].sort((a,b)=>counts[a.id]-counts[b.id]);
+      const color=CHILD_COLORS[child];
+      html+=`<div class="stats-group-label" style="color:${color}">👦 ${child}</div><div class="stats-card">`;
+      sorted.forEach(t=>{
+        const n=counts[t.id], pct=period?Math.round(n/period*100):0;
+        const col=pct>=80?'#34C759':pct>=50?'#FF9500':'#FF3B30';
+        html+=`<div class="stat-row"><div class="stat-top"><span class="stat-name">${t.text}</span><span class="stat-pct" style="color:${col}">${pct}%</span></div><div class="stat-bar-bg"><div class="stat-bar-fill" style="width:${pct}%;background:${col}"></div></div><div class="stat-sub">${n} von ${period} Tagen</div></div>`;
+      });
+      html+=`</div>`;
+    });
+  } else {
+    const tasks=filteredTasks();
+    const taskIds=new Set(tasks.map(t=>t.id));
+    const counts={};
+    tasks.forEach(t=>{counts[t.id]=0;});
+    data.filter(c=>taskIds.has(c.task_id)).forEach(c=>{if(counts[c.task_id]!==undefined) counts[c.task_id]++;});
+    const sorted=[...tasks].sort((a,b)=>counts[a.id]-counts[b.id]);
+    html+=`<div class="stats-card">`;
+    sorted.forEach(t=>{
+      const n=counts[t.id], pct=period?Math.round(n/period*100):0;
+      const col=pct>=80?'#34C759':pct>=50?'#FF9500':'#FF3B30';
+      html+=`<div class="stat-row"><div class="stat-top"><span class="stat-name">${t.text}</span><span class="stat-pct" style="color:${col}">${pct}%</span></div><div class="stat-bar-bg"><div class="stat-bar-fill" style="width:${pct}%;background:${col}"></div></div><div class="stat-sub">${n} von ${period} Tagen erledigt</div></div>`;
+    });
+    html+=`</div>`;
+  }
+  html+=`</div>`;
+  el.innerHTML=html;
 }
 async function changePeriod(d){ period=d; showLoading(); const data=await loadStats().catch(()=>[]); renderStats(data); }
 
 // ── Enter keys ────────────────────────────────────────────
-document.addEventListener('keydown', e=>{
-  if(e.key==='Enter' && document.getElementById('overlayTask').style.display!=='none') submitNewTask();
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&document.getElementById('overlayTask').style.display!=='none') submitNewTask();
 });
 
 // ── Init ──────────────────────────────────────────────────
-async function init() {
-  document.getElementById('topDate').textContent = fmtDate(new Date());
+async function init(){
+  document.getElementById('topDate').textContent=fmtDate(new Date());
   if(!user){ document.getElementById('overlayUser').style.display='flex'; } else { refreshToggle(); }
   try {
-    await loadTasks(); await loadToday(); renderToday();
-  } catch(e) {
+    await loadTasks(); await loadToday();
+    if(currentList==='kinder') renderKinder(); else renderToday();
+  } catch(e){
     document.getElementById('content').innerHTML=`<div class="loading"><span style="font-size:2rem">⚠️</span><span>Verbindungsfehler – bitte Internetverbindung prüfen.</span></div>`;
   }
 }
