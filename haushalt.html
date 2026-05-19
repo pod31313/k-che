@@ -47,6 +47,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI'
 .list-btn.haushalt.active { color: var(--blue); }
 .list-btn.kinder.active   { color: var(--green); }
 .list-btn.abend.active    { color: var(--purple); }
+.list-btn.b.active        { color: #00C7BE; }
+.list-b-icon { font-size: 1.05rem; font-weight: 900; letter-spacing: -.02em; }
 
 /* ── CONTENT ── */
 .content { padding-bottom: calc(58px + var(--safe-b) + 20px); min-height: 80vh; }
@@ -394,6 +396,7 @@ function listToggleHTML() {
     <button class="list-btn haushalt ${currentList==='haushalt'?'active':''}" onclick="setList('haushalt')">🏠<br>Haushalt</button>
     <button class="list-btn kinder  ${currentList==='kinder'  ?'active':''}" onclick="setList('kinder')">👦<br>Kinder</button>
     <button class="list-btn abend   ${currentList==='abend'   ?'active':''}" onclick="setList('abend')">🌙<br>Abend</button>
+    <button class="list-btn b       ${currentList==='b'       ?'active':''}" onclick="setList('b')"><span class="list-b-icon">B</span><br>B</button>
   </div>`;
 }
 
@@ -422,18 +425,22 @@ function showLoading(){ document.getElementById('content').innerHTML='<div class
 // ── Render: Heute (Haushalt / Abend) ──────────────────────
 function renderToday(){
   const el=document.getElementById('content');
-  const tasks=filteredTasks();
+  const dow=todayDow();
+  // Filter by day_of_week so day-specific tasks only show on their day
+  const tasks=filteredTasks().filter(t=>t.day_of_week===null||t.day_of_week===dow);
   const handledSet=new Set(todayC.map(c=>c.task_id));
   const handled=tasks.filter(t=>handledSet.has(t.id)).length, total=tasks.length;
   const pct=total?Math.round(handled/total*100):0;
-  const barColor=currentList==='abend'?'var(--purple)':'var(--green)';
+  const barColor=currentList==='abend'?'var(--purple)':currentList==='b'?'#00C7BE':'var(--green)';
+  const DAY_BADGE={2:'Di',3:'Mi',5:'Fr',6:'Sa'};
   let rows='';
   tasks.forEach(t=>{
     const c=todayC.find(x=>x.task_id===t.id);
     const isDone=c&&c.status==='done', isSkip=c&&c.status==='skip';
+    const dayBadge=t.day_of_week!==null&&DAY_BADGE[t.day_of_week]?`<span class="kinder-day-badge">${DAY_BADGE[t.day_of_week]}</span>`:'';
     rows+=`<div class="task-row ${isDone?'done':isSkip?'skip':''}" onclick="toggle('${t.id}')">
       <div class="check">${isDone?'✓':isSkip?'⊘':''}</div>
-      <div class="task-label">${t.text}</div>
+      <div class="task-label">${t.text}${dayBadge}</div>
       ${isDone?`<span class="task-badge ${c.done_by}">${c.done_by}</span>`:''}
       ${isSkip?`<span class="task-badge skip-badge">–</span>`:''}
     </div>`;
@@ -448,7 +455,8 @@ function renderToday(){
 }
 
 function openAddTask(){
-  document.getElementById('taskSheetSub').textContent=`Zur Liste „${currentList==='abend'?'Abend':'Haushalt'}" hinzufügen.`;
+  const label={'haushalt':'Haushalt','abend':'Abend','b':'B'}[currentList]||'Haushalt';
+  document.getElementById('taskSheetSub').textContent=`Zur Liste „${label}" hinzufügen.`;
   document.getElementById('overlayTask').style.display='flex';
 }
 
@@ -551,9 +559,13 @@ function renderWeek(data){
       return `<tr class="week-row-tr"><td class="week-name-td">${t.text}</td>${cells}</tr>`;
     }).join('');
   } else {
-    const tasks=filteredTasks();
+    const tasks=filteredTasks(); // all tasks of list (incl. day-specific)
     trows=tasks.map(t=>{
       const cells=wd.map(d=>{
+        const dayOfWeek=new Date(d+'T12:00:00').getDay();
+        // day-specific task: mark n/a on days it doesn't apply
+        if(t.day_of_week!==null&&t.day_of_week!==dayOfWeek)
+          return `<td class="week-dot-td"><div class="wdot na" style="color:var(--text-2);font-size:.7rem">–</div></td>`;
         const c=allIdx[t.id+'_'+d], fut=d>t0;
         if(c&&c.status==='skip') return `<td class="week-dot-td"><div class="wdot wdot-skip">⊘</div></td>`;
         if(c) return `<td class="week-dot-td"><div class="wdot ${c.done_by}">${c.done_by}</div></td>`;
