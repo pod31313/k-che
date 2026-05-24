@@ -250,16 +250,20 @@ function renderToday() {
   const done=tasks.filter(t=>doneSet.has(t.id)).length, total=tasks.length;
   updateHeader(done,total);
 
-  let rows='';
-  tasks.forEach(t=>{
-    const isDone=doneSet.has(t.id), isDaySpec=t.day_of_week!==null;
-    const dayLabel=isDaySpec?`<span class="day-badge">${t.day_of_week===5?'Freitag':'Samstag'}</span>`:'';
-    rows+=`<div class="task-row ${isDone?'done':''}" onclick="toggle('${t.id}')">
-      <div class="check">${isDone?'✓':''}</div>
-      <span class="task-label">${t.text}</span>
-      ${dayLabel}
-    </div>`;
-  });
+  const morgenTasks = tasks.filter(t=>(t.sort_order||0)<10);
+  const nachTasks   = tasks.filter(t=>(t.sort_order||0)>=10);
+
+  function buildRows(taskList){
+    return taskList.map(t=>{
+      const isDone=doneSet.has(t.id), isDaySpec=t.day_of_week!==null;
+      const dayLabel=isDaySpec?`<span class="day-badge">${t.day_of_week===5?'Freitag':'Samstag'}</span>`:'';
+      return `<div class="task-row ${isDone?'done':''}" onclick="toggle('${t.id}')">
+        <div class="check">${isDone?'✓':''}</div>
+        <span class="task-label">${t.text}</span>
+        ${dayLabel}
+      </div>`;
+    }).join('');
+  }
 
   let allDoneHtml='';
   if(done===total&&total>0) {
@@ -268,8 +272,15 @@ function renderToday() {
 
   el.innerHTML=`
     ${allDoneHtml}
-    <div class="section-label">Aufgaben heute</div>
-    <div class="task-list-wrap"><div class="task-card">${rows||'<div style="padding:20px;text-align:center;color:var(--text-2);font-size:.9rem">Keine Aufgaben heute</div>'}</div></div>`;
+    ${morgenTasks.length>0?`
+      <div class="section-label">Morgen</div>
+      <div class="task-list-wrap"><div class="task-card">${buildRows(morgenTasks)}</div></div>`:''}
+    ${nachTasks.length>0?`
+      <div class="section-label">Nachmittag</div>
+      <div class="task-list-wrap"><div class="task-card">${buildRows(nachTasks)}</div></div>`:''}
+    ${tasks.length===0?`
+      <div class="section-label">Aufgaben heute</div>
+      <div class="task-list-wrap"><div class="task-card"><div style="padding:20px;text-align:center;color:var(--text-2);font-size:.9rem">Keine Aufgaben heute</div></div></div>`:''}`;
 }
 
 function renderWeek(data) {
