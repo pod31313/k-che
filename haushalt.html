@@ -473,36 +473,44 @@ function renderKinder(){
   const totalAll=allChildTasks.length;
   const pct=totalAll?Math.round(totalDone/totalAll*100):0;
 
-  const cols=CHILDREN.map(child=>{
-    const color=CHILD_COLORS[child];
-    const childTasks=kinderTasks.filter(t=>t.child_name===child&&(t.day_of_week===null||t.day_of_week===dow));
-    const handledCnt=childTasks.filter(t=>handledSet.has(t.id)).length;
-    const totalCnt=childTasks.length;
-    const taskRows=childTasks.map(t=>{
-      const c=todayC.find(x=>x.task_id===t.id);
-      const isDone=c&&c.status==='done', isSkip=c&&c.status==='skip';
-      const isDaySpec=t.day_of_week!==null;
-      return `<div class="kinder-task ${isDone?'done':isSkip?'skip':''}" onclick="toggle('${t.id}')">
-        <div class="kinder-check">${isDone?'✓':isSkip?'⊘':''}</div>
-        <div><span class="kinder-label">${t.text}</span>${isDaySpec?`<span class="kinder-day-badge">${t.day_of_week===5?'Fr':'Sa'}</span>`:''}</div>
+  // Baut ein Kinder-Grid für einen Abschnitt (Morgen: sort_order<10 / Nachmittag: >=10)
+  function buildGrid(sectionFilter){
+    return CHILDREN.map(child=>{
+      const color=CHILD_COLORS[child];
+      const childTasks=kinderTasks.filter(t=>t.child_name===child&&(t.day_of_week===null||t.day_of_week===dow)&&sectionFilter(t));
+      const handledCnt=childTasks.filter(t=>handledSet.has(t.id)).length;
+      const totalCnt=childTasks.length;
+      const taskRows=childTasks.map(t=>{
+        const c=todayC.find(x=>x.task_id===t.id);
+        const isDone=c&&c.status==='done', isSkip=c&&c.status==='skip';
+        const isDaySpec=t.day_of_week!==null;
+        return `<div class="kinder-task ${isDone?'done':isSkip?'skip':''}" onclick="toggle('${t.id}')">
+          <div class="kinder-check">${isDone?'✓':isSkip?'⊘':''}</div>
+          <div><span class="kinder-label">${t.text}</span>${isDaySpec?`<span class="kinder-day-badge">${t.day_of_week===5?'Fr':'Sa'}</span>`:''}</div>
+        </div>`;
+      }).join('');
+      return `<div class="kinder-col">
+        <div class="kinder-header" style="border-color:${color};background:${color}18">
+          <span class="kinder-name" style="color:${color}">${child}</span>
+          <span class="kinder-count" style="color:${color}">${handledCnt}/${totalCnt}</span>
+        </div>
+        ${taskRows||'<div style="padding:10px;font-size:.72rem;color:var(--text-2);text-align:center">–</div>'}
       </div>`;
     }).join('');
-    return `<div class="kinder-col">
-      <div class="kinder-header" style="border-color:${color};background:${color}18">
-        <span class="kinder-name" style="color:${color}">${child}</span>
-        <span class="kinder-count" style="color:${color}">${handledCnt}/${totalCnt}</span>
-      </div>
-      ${taskRows||'<div style="padding:10px;font-size:.72rem;color:var(--text-2);text-align:center">–</div>'}
-    </div>`;
-  }).join('');
+  }
+
+  const morgenGrid  = buildGrid(t=>(t.sort_order||0)<10);
+  const nachGrid    = buildGrid(t=>(t.sort_order||0)>=10);
 
   el.innerHTML=`${listToggleHTML()}
     <div class="progress-wrap">
       <div class="progress-meta"><span><strong>${totalDone}</strong> von ${totalAll} erledigt</span><span>${pct}%</span></div>
       <div class="pbar-bg"><div class="pbar-fill" style="width:${pct}%;background:var(--green)"></div></div>
     </div>
-    <div class="section-label"><span>Kinder vor Freizeit</span></div>
-    <div class="kinder-grid">${cols}</div>`;
+    <div class="section-label"><span>Morgen</span></div>
+    <div class="kinder-grid">${morgenGrid}</div>
+    <div class="section-label" style="margin-top:4px;padding-top:14px;border-top:1px solid var(--border)"><span>Nachmittag</span></div>
+    <div class="kinder-grid">${nachGrid}</div>`;
 }
 
 // ── Render: Woche ─────────────────────────────────────────
