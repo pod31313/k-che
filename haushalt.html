@@ -98,6 +98,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI'
 .kinder-task.done .kinder-label { color: var(--text-2); text-decoration: line-through; }
 .kinder-day-badge { font-size: 0.6rem; display: block; color: var(--orange); font-weight: 600; margin-top: 1px; }
 
+/* ── KIND-SELBST-CHECK (2. Checkbox) ── */
+.kinder-self-check {
+  width: 14px; height: 14px; border-radius: 3px;
+  border: 1.5px solid var(--gray-mid); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.52rem; color: white; margin-top: 1px;
+  background: transparent; transition: all .15s; opacity: 0.55;
+}
+.kinder-self-check.done { background: var(--green); border-color: var(--green); opacity: 1; }
+.kinder-legend-row { display: flex; gap: 12px; padding: 4px 18px 8px; font-size: 0.68rem; color: var(--text-2); align-items: center; }
+.kinder-legend-item { display: flex; align-items: center; gap: 4px; }
+.kinder-legend-box { width: 12px; height: 12px; border-radius: 2px; border: 1.5px solid var(--gray-mid); flex-shrink: 0; }
+.kinder-legend-box.self { opacity: 0.55; }
+
 /* ── KINDER WEEK CHILD SELECTOR ── */
 .child-selector { display: flex; gap: 6px; padding: 4px 4px 10px; }
 .child-btn { flex: 1; padding: 7px 4px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--card); font-size: 0.78rem; font-weight: 600; cursor: pointer; text-align: center; transition: all .15s; color: var(--gray); }
@@ -442,6 +456,11 @@ async function loadRecentBCompletions() {
     .in('task_id',bIds).gte('date',start.toISOString().split('T')[0]).lte('date',today());
   return error?[]:(data||[]);
 }
+async function loadChildSelfCompletions() {
+  const {data,error}=await db.from('child_completions').select('task_id,child_name').eq('date',today());
+  return error?[]:(data||[]);
+}
+
 async function loadCalendarMonth(year,month) { // month 0-indexed
   const m1=String(month+1).padStart(2,'0');
   const start=`${year}-${m1}-01`;
@@ -543,7 +562,9 @@ function refreshToggle(){ document.getElementById('btnE').classList.toggle('acti
 // ── List ──────────────────────────────────────────────────
 function setList(list) {
   currentList=list; localStorage.setItem('hh_list',list);
-  if(list==='b'&&tab==='h'){
+  if(list==='kinder'&&tab==='h'){
+    loadChildSelfCompletions().then(d=>{ window._childSelfC=d; renderKinder(); });
+  } else if(list==='b'&&tab==='h'){
     loadRecentBCompletions().then(rc=>{ window._recentBC=rc; renderB(); });
   } else {
     renderCurrentTab();
@@ -901,6 +922,8 @@ function renderKinder(){
   const totalAll=allChildTasks.length;
   const pct=totalAll?Math.round(totalDone/totalAll*100):0;
 
+  const selfC = window._childSelfC || []; // child_completions für heute
+
   // Baut ein Kinder-Grid für einen Abschnitt (Morgen: sort_order<10 / Nachmittag: >=10)
   function buildGrid(sectionFilter){
     return CHILDREN.map(child=>{
@@ -912,9 +935,12 @@ function renderKinder(){
         const c=todayC.find(x=>x.task_id===t.id);
         const isDone=c&&c.status==='done', isSkip=c&&c.status==='skip';
         const isDaySpec=t.day_of_week!==null;
+        // Hat das Kind selbst abgehakt? (child_completions)
+        const selfDone=selfC.some(s=>s.task_id===t.id&&s.child_name===child);
         return `<div class="kinder-task ${isDone?'done':isSkip?'skip':''}" onclick="toggle('${t.id}')">
           <div class="kinder-check">${isDone?'✓':isSkip?'⊘':''}</div>
-          <div><span class="kinder-label">${t.text}</span>${isDaySpec?`<span class="kinder-day-badge">${t.day_of_week===5?'Fr':'Sa'}</span>`:''}</div>
+          <div style="flex:1"><span class="kinder-label">${t.text}</span>${isDaySpec?`<span class="kinder-day-badge">${t.day_of_week===5?'Fr':'Sa'}</span>`:''}</div>
+          <div class="kinder-self-check ${selfDone?'done':''}" title="${selfDone?child+' hat selbst abgehakt':'noch nicht selbst abgehakt'}">${selfDone?'✓':''}</div>
         </div>`;
       }).join('');
       return `<div class="kinder-col">
@@ -934,6 +960,11 @@ function renderKinder(){
     <div class="progress-wrap">
       <div class="progress-meta"><span><strong>${totalDone}</strong> von ${totalAll} erledigt</span><span>${pct}%</span></div>
       <div class="pbar-bg"><div class="pbar-fill" style="width:${pct}%;background:var(--green)"></div></div>
+    </div>
+    <div class="kinder-legend-row">
+      <div class="kinder-legend-item"><div class="kinder-legend-box"></div>Elternteil</div>
+      <div class="kinder-legend-item"><div class="kinder-legend-box self"></div>Kind selbst</div>
+      <button style="margin-left:auto;font-size:0.68rem;color:var(--blue);background:none;border:none;cursor:pointer;padding:0" onclick="loadChildSelfCompletions().then(d=>{window._childSelfC=d;renderKinder()})">↻ Kinder-Stand</button>
     </div>
     <div class="section-label"><span>Morgen</span></div>
     <div class="kinder-grid">${morgenGrid}</div>
@@ -1156,6 +1187,7 @@ async function init(){
     await loadTasks();
     await loadToday();
     if(currentList==='b') window._recentBC=await loadRecentBCompletions().catch(()=>[]);
+    if(currentList==='kinder') window._childSelfC=await loadChildSelfCompletions().catch(()=>[]);
   } catch(e){
     const msg = e?.message || e?.details || JSON.stringify(e) || 'Unbekannter Fehler';
     document.getElementById('content').innerHTML=`<div class="loading"><span style="font-size:2rem">⚠️</span><span>Verbindungsfehler – bitte Internetverbindung prüfen.<br><small style="opacity:.6;font-size:.75rem">${msg}</small></span><button onclick="init()" style="margin-top:14px;padding:10px 24px;border-radius:10px;border:none;background:var(--blue);color:white;font-size:.9rem;font-weight:600">Erneut versuchen</button></div>`;
