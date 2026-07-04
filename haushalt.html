@@ -206,6 +206,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI'
 .cal-detail-reason { font-size: 0.75rem; color: var(--text-2); margin-top: 3px; font-style: italic; }
 .cal-detail-meta { font-size: 0.72rem; color: var(--text-2); margin-top: 2px; }
 .cal-detail-close { display: block; width: 100%; margin-top: 14px; padding: 12px; background: var(--gray-light); border: none; border-radius: 12px; font-size: .9rem; font-weight: 500; color: var(--text-2); cursor: pointer; }
+.cal-detail-child-label { font-size: .82rem; font-weight: 700; margin-bottom: 5px; margin-top: 4px; }
+.cal-detail-self-row { font-size: .72rem; color: var(--text-2); margin-top: 5px; padding-top: 4px; border-top: 1px dashed var(--border); }
+.cal-summary-bar { display: flex; gap: 16px; padding: 4px 4px 10px; font-size: .76rem; color: var(--text-2); flex-wrap: wrap; }
+/* Kinder-Punkte im Monatskalender */
+.cal-kid-dots { display: flex; gap: 2px; margin-top: 4px; }
+.cal-kid-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--gray-mid); flex-shrink: 0; }
 
 /* ── STATS VIEW ── */
 .stats-wrap { padding: 0 14px 8px; }
@@ -460,6 +466,28 @@ async function loadChildSelfCompletions() {
   const {data,error}=await db.from('child_completions').select('task_id,child_name').eq('date',today());
   return error?[]:(data||[]);
 }
+// Eltern-Completions für beliebige Liste + Monat
+async function loadCalendarMonthForList(year,month,listName){
+  const m1=String(month+1).padStart(2,'0');
+  const days=new Date(year,month+1,0).getDate();
+  const start=`${year}-${m1}-01`, end=`${year}-${m1}-${String(days).padStart(2,'0')}`;
+  const ids=allTasks.filter(t=>t.list_name===listName).map(t=>t.id);
+  if(!ids.length) return [];
+  const {data,error}=await db.from('completions').select('*')
+    .in('task_id',ids).gte('date',start).lte('date',end);
+  return error?[]:(data||[]);
+}
+// Kind-Selbst-Completions für Kinder + Monat
+async function loadCalendarMonthKinder(year,month){
+  const m1=String(month+1).padStart(2,'0');
+  const days=new Date(year,month+1,0).getDate();
+  const start=`${year}-${m1}-01`, end=`${year}-${m1}-${String(days).padStart(2,'0')}`;
+  const ids=allTasks.filter(t=>t.list_name==='kinder').map(t=>t.id);
+  if(!ids.length) return [];
+  const {data,error}=await db.from('child_completions').select('task_id,date,child_name')
+    .in('task_id',ids).gte('date',start).lte('date',end);
+  return error?[]:(data||[]);
+}
 
 async function loadCalendarMonth(year,month) { // month 0-indexed
   const m1=String(month+1).padStart(2,'0');
@@ -598,8 +626,9 @@ async function renderTab(){
   } else if(tab==='e'){
     showLoading(); const d=await loadShopping().catch(()=>[]); window._shopItems=d; renderShop(d);
   } else {
-    if(currentList==='b'){ calOffset=0; await renderBCalendar(); }
-    else { showLoading(); const d=await loadStats().catch(()=>[]); renderStats(d); }
+    calOffset=0;
+    if(currentList==='b') await renderBCalendar();
+    else await renderGeneralCalendar();
   }
 }
 function showLoading(){ document.getElementById('content').innerHTML='<div class="loading"><div class="spin"></div></div>'; }
@@ -900,7 +929,170 @@ function closeCalDetail(e){
 }
 async function changeCalMonth(dir){
   if(dir>0&&calOffset>=0) return;
-  calOffset+=dir; await renderBCalendar();
+  calOffset+=dir;
+  if(currentList==='b') await renderBCalendar();
+  else await renderGeneralCalendar();
+}
+
+// ── Render: Monatskalender Haushalt / Kinder / Abend ─────
+async function renderGeneralCalendar(){
+  const el=document.getElementById('content');
+  showLoading();
+  const base=new Date(); base.setMonth(base.getMonth()+calOffset);
+  const year=base.getFullYear(), month=base.getMonth();
+  const isKinder=currentList==='kinder';
+  const listTasks=allTasks.filter(t=>t.list_name===currentList);
+
+  // Eltern-Completions für diesen Monat
+  const compData=await loadCalendarMonthForList(year,month,currentList);
+  // Für Kinder zusätzlich: Selbst-Abhakungen der Kinder
+  const kidData=isKinder ? await loadCalendarMonthKinder(year,month) : [];
+
+  // Vorab-Map: Datum → completions[]
+  const compByDate={};
+  compData.forEach(c=>{ if(!compByDate[c.date]) compByDate[c.date]=[]; compByDate[c.date].push(c); });
+
+  // Für Kinder-Dots: Datum → {child: bool}
+  const childDotMap={};
+  if(isKinder){
+    compData.filter(c=>c.status==='done').forEach(c=>{
+      const t=listTasks.find(x=>x.id===c.task_id); if(!t) return;
+      if(!childDotMap[c.date]) childDotMap[c.date]={};
+      childDotMap[c.date][t.child_name]=true;
+    });
+  }
+
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  const firstDow=new Date(year,month,1).getDay();
+  const startOffset=firstDow===0?6:firstDow-1;
+  const todayNow=new Date();
+  const isCurMonth=year===todayNow.getFullYear()&&month===todayNow.getMonth();
+  const listColor={haushalt:'var(--green)',abend:'var(--purple)'}[currentList]||'var(--green)';
+
+  // Zusammenfassung
+  const doneDays=new Set(Object.entries(compByDate).filter(([,cs])=>cs.some(c=>c.status==='done')).map(([d])=>d)).size;
+  const totalDone=compData.filter(c=>c.status==='done').length;
+  const kidSelfTotal=kidData.length;
+  const summaryHtml=`<div class="cal-summary-bar">
+    <span>📅 ${doneDays} Tage mit Einträgen</span>
+    <span>✓ ${totalDone} Aufgaben erledigt</span>
+    ${isKinder?`<span>👦 ${kidSelfTotal} eigene Abhakungen</span>`:''}
+  </div>`;
+
+  // Tages-Zellen
+  let daysHtml='';
+  for(let i=0;i<startOffset;i++) daysHtml+=`<div class="cal-day empty-day"></div>`;
+  for(let d=1;d<=daysInMonth;d++){
+    const ds=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday=isCurMonth&&d===todayNow.getDate();
+    const isFuture=isCurMonth&&d>todayNow.getDate();
+    let innerHtml='';
+    if(isKinder){
+      const cm=childDotMap[ds]||{};
+      innerHtml=`<div class="cal-kid-dots">${CHILDREN.map(child=>
+        `<div class="cal-kid-dot" style="${cm[child]?`background:${CHILD_BG[child]}`:''}"></div>`
+      ).join('')}</div>`;
+    } else {
+      const done=(compByDate[ds]||[]).filter(c=>c.status==='done').length;
+      if(done>0) innerHtml=`<div class="cal-day-dots">${
+        Array.from({length:Math.min(done,5)},()=>`<div class="cal-dot" style="background:${listColor}"></div>`).join('')
+      }${done>5?`<span style="font-size:.44rem;color:var(--text-2)">+${done-5}</span>`:''}</div>`;
+    }
+    daysHtml+=`<div class="cal-day ${isToday?'today-day':''} ${isFuture?'future-day':''}" onclick="showGeneralCalDetail('${ds}')">
+      <div class="cal-day-num">${d}</div>${innerHtml}
+    </div>`;
+  }
+
+  const listLabel={haushalt:'🏠 Haushalt',kinder:'👦 Kinder',abend:'🌙 Abend'}[currentList]||currentList;
+  const legendHtml=isKinder
+    ?`<div class="cal-legend" style="gap:10px">
+        ${CHILDREN.map(c=>`<div class="cal-leg-item"><div class="cal-kid-dot" style="background:${CHILD_BG[c]};width:9px;height:9px"></div>${c}</div>`).join('')}
+        <div class="cal-leg-item"><div class="cal-kid-dot" style="width:9px;height:9px"></div>kein Eintrag</div>
+      </div>`
+    :`<div class="cal-legend">
+        <div class="cal-leg-item"><div class="cal-dot" style="background:${listColor}"></div>Aufgabe erledigt</div>
+      </div>`;
+
+  el.innerHTML=`${listToggleHTML()}
+    <div class="section-label"><span>Monatsübersicht – ${listLabel}</span></div>
+    <div class="cal-wrap">
+      <div class="cal-nav">
+        <button class="cal-nav-btn" onclick="changeCalMonth(-1)">← Zurück</button>
+        <span class="cal-label">${DE_M[month]} ${year}</span>
+        <button class="cal-nav-btn" onclick="changeCalMonth(1)" ${calOffset>=0?'disabled':''}>Vor →</button>
+      </div>
+      ${summaryHtml}
+      <div class="cal-grid">
+        <div class="cal-dow-row">${['Mo','Di','Mi','Do','Fr','Sa','So'].map(d=>`<div class="cal-dow-cell">${d}</div>`).join('')}</div>
+        <div class="cal-days-grid">${daysHtml}</div>
+      </div>
+      ${legendHtml}
+    </div>`;
+
+  window._calDataGeneral={year,month,compData,kidData,listTasks,isKinder,compByDate};
+}
+
+function showGeneralCalDetail(ds){
+  if(!window._calDataGeneral) return;
+  const {compData,kidData,listTasks,isKinder,compByDate}=window._calDataGeneral;
+  const d=new Date(ds+'T12:00:00');
+  const dayComps=compByDate[ds]||[];
+  let rows='';
+
+  if(isKinder){
+    let anyEntry=false;
+    CHILDREN.forEach(child=>{
+      const color=CHILD_COLORS[child];
+      const bg=CHILD_BG[child];
+      // Eltern-Einträge für dieses Kind
+      const parentDone=dayComps.filter(c=>c.status==='done').filter(c=>{
+        const t=listTasks.find(x=>x.id===c.task_id); return t&&t.child_name===child;
+      });
+      // Eigene Abhakungen des Kindes
+      const selfDone=kidData.filter(c=>c.date===ds&&c.child_name===child);
+      if(!parentDone.length&&!selfDone.length) return;
+      anyEntry=true;
+      rows+=`<div style="margin-bottom:14px">
+        <div class="cal-detail-child-label" style="color:${color}">${child}</div>
+        ${parentDone.map(c=>{
+          const t=listTasks.find(x=>x.id===c.task_id); if(!t) return '';
+          return `<div class="cal-detail-row">
+            <div class="cal-detail-icon done" style="background:${bg}">✓</div>
+            <div class="cal-detail-text"><div>${t.text}</div>
+            ${c.done_by&&c.done_by!=='?'?`<div class="cal-detail-meta">abgehakt von ${c.done_by}</div>`:''}
+            </div></div>`;
+        }).join('')}
+        ${selfDone.length?`<div class="cal-detail-self-row">Kind selbst: ${
+          selfDone.map(c=>{const t=listTasks.find(x=>x.id===c.task_id);return t?`✓ ${t.text}`:''}).filter(Boolean).join(' · ')
+        }</div>`:''}
+      </div>`;
+    });
+    if(!anyEntry) rows=`<div style="padding:16px 0;text-align:center;color:var(--text-2);font-size:.87rem">Keine Einträge</div>`;
+  } else {
+    const done=dayComps.filter(c=>c.status==='done');
+    done.forEach(c=>{
+      const t=listTasks.find(x=>x.id===c.task_id); if(!t) return;
+      rows+=`<div class="cal-detail-row">
+        <div class="cal-detail-icon done">✓</div>
+        <div class="cal-detail-text"><div>${t.text}</div>
+        ${c.done_by&&c.done_by!=='?'?`<div class="cal-detail-meta">von ${c.done_by}</div>`:''}
+        </div></div>`;
+    });
+    if(!rows) rows=`<div style="padding:16px 0;text-align:center;color:var(--text-2);font-size:.87rem">Keine Einträge</div>`;
+  }
+
+  document.getElementById('content').insertAdjacentHTML('beforeend',`
+    <div class="cal-detail-overlay" id="genCalDetailOverlay" onclick="closeGeneralCalDetail(event)">
+      <div class="cal-detail-sheet">
+        <div class="cal-detail-date">${fmtDate(d)}</div>
+        ${rows}
+        <button class="cal-detail-close" onclick="closeGeneralCalDetail()">Schließen</button>
+      </div>
+    </div>`);
+}
+function closeGeneralCalDetail(e){
+  const ov=document.getElementById('genCalDetailOverlay');
+  if(!e||e.target===ov) ov&&ov.remove();
 }
 
 function openAddTask(){
