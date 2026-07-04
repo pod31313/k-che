@@ -227,6 +227,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI'
 .qty-cat-row { display: flex; gap: 8px; padding: 0 4px 8px; }
 .small-select { flex: 1; border: 1.5px solid var(--border); border-radius: 10px; padding: 9px 10px; font-size: 0.82rem; background: var(--card); color: var(--text); font-family: inherit; outline: none; -webkit-appearance: none; }
 
+/* ── STRICT OPTS SHEET (3 Tabs) ── */
+.strict-tab { flex: 1; padding: 8px 4px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--card); font-size: 0.7rem; font-weight: 600; color: var(--gray); cursor: pointer; text-align: center; transition: all .15s; line-height: 1.3; }
+.strict-tab.active { background: #00C7BE; border-color: #00C7BE; color: white; }
+.strict-tabs { display: flex; gap: 6px; margin-bottom: 16px; }
+.strict-tab-panel { display: flex; flex-direction: column; gap: 12px; }
+.strict-label { font-size: 0.82rem; color: var(--text-2); margin-bottom: 2px; }
+
 /* ── LOADING ── */
 .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 50vh; gap: 14px; color: var(--text-2); font-size: 0.9rem; }
 .spin { width: 30px; height: 30px; border-radius: 50%; border: 3px solid var(--gray-mid); border-top-color: var(--blue); animation: spin .8s linear infinite; }
@@ -264,16 +271,41 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI'
   </div>
 </div>
 
-<!-- Grund-Eingabe (Pflichtaufgabe nicht erledigt) -->
-<div class="overlay" id="overlayReason" style="display:none" onclick="closeReasonSheet(event)">
+<!-- Optionen-Sheet (Pflichtaufgaben: Nachträglich / Verschieben / Begründung) -->
+<div class="overlay" id="overlayStrictOpts" style="display:none" onclick="closeStrictOpts(event)">
   <div class="sheet">
-    <h2 id="reasonTitle">Nicht erledigt</h2>
-    <p id="reasonSub" style="font-size:.85rem;color:var(--text-2);margin-bottom:16px"></p>
-    <div class="sheet-form">
-      <textarea class="sheet-input" id="reasonInput" placeholder="Kurze Begründung …" rows="3" style="resize:none;min-height:80px;font-family:inherit"></textarea>
-      <button class="sheet-submit" onclick="submitReason()">Speichern</button>
-      <button class="sheet-cancel" onclick="document.getElementById('overlayReason').style.display='none';_pendingReason=null">Später</button>
+    <h2 id="strictOptsTitle">Optionen</h2>
+    <p id="strictOptsSub" style="font-size:.82rem;color:var(--text-2);margin-bottom:14px"></p>
+    <div class="strict-tabs">
+      <button class="strict-tab active" id="tabDoneBtn" onclick="showStrictTab('done')">✓ Nachträglich</button>
+      <button class="strict-tab" id="tabMoveBtn" onclick="showStrictTab('move')">→ Verschieben</button>
+      <button class="strict-tab" id="tabReasonBtn" onclick="showStrictTab('reason')">💬 Begründung</button>
     </div>
+    <!-- Tab: Nachträglich erledigt -->
+    <div id="strictTabDone" class="strict-tab-panel">
+      <div>
+        <div class="strict-label">Wann wurde die Aufgabe erledigt?</div>
+        <input type="date" class="sheet-input" id="strictDoneDate" style="width:100%;margin-top:4px">
+      </div>
+      <button class="sheet-submit" onclick="submitStrictDone()">Als erledigt markieren</button>
+    </div>
+    <!-- Tab: Verschieben -->
+    <div id="strictTabMove" class="strict-tab-panel" style="display:none">
+      <div>
+        <div class="strict-label">Auf welchen Tag verschieben?</div>
+        <input type="date" class="sheet-input" id="strictMoveDate" style="width:100%;margin-top:4px">
+      </div>
+      <button class="sheet-submit" onclick="submitStrictMove()">Verschieben</button>
+    </div>
+    <!-- Tab: Begründung -->
+    <div id="strictTabReason" class="strict-tab-panel" style="display:none">
+      <div>
+        <div class="strict-label">Warum nicht erledigt?</div>
+        <textarea class="sheet-input" id="strictReasonText" rows="3" placeholder="Kurze Begründung …" style="resize:none;min-height:75px;font-family:inherit;margin-top:4px;width:100%"></textarea>
+      </div>
+      <button class="sheet-submit" onclick="submitStrictReason()">Speichern</button>
+    </div>
+    <button class="sheet-cancel" style="margin-top:6px;width:100%" onclick="closeStrictOpts()">Abbrechen</button>
   </div>
 </div>
 
@@ -330,7 +362,7 @@ let period      = 28;
 let weekOffset  = 0;
 let weekChild   = localStorage.getItem('hh_weekChild') || 'Anton';
 let calOffset   = 0;
-let _pendingReason = null;
+let _pendingStrict = null;          // { taskId, dueDate } für overlayStrictOpts
 const _promptedReasons = new Set();
 
 const CHILDREN = ['Anton', 'Friedrich', 'Justus'];
@@ -451,15 +483,20 @@ async function toggle(taskId) {
     const {data}=await db.from('completions').insert({task_id:taskId,date:today(),done_by:user,status:newStatus}).select().single();
     if(data){
       todayC=todayC.filter(c=>c.id!=='_tmp'); todayC.push(data);
-      // Zweiwöchentliche Aufgabe (Rasenmähen): next_due_date vorrücken
+      // next_due_date nach Erledigung anpassen
       if(newStatus==='done'){
         const task=allTasks.find(t=>t.id===taskId);
         if(task&&task.recurrence_days&&task.next_due_date){
+          // Wiederkehrende Aufgabe (Rasenmähen): next_due_date vorrücken
           const nd=new Date(today()+'T12:00:00');
           nd.setDate(nd.getDate()+task.recurrence_days);
           const ndStr=nd.toISOString().split('T')[0];
           await db.from('tasks').update({next_due_date:ndStr}).eq('id',taskId);
           task.next_due_date=ndStr;
+        } else if(task&&task.next_due_date&&!task.recurrence_days){
+          // Nicht-wiederkehrend mit temp. next_due_date (Verschiebe-Override): löschen
+          await db.from('tasks').update({next_due_date:null}).eq('id',taskId);
+          task.next_due_date=null;
         }
       }
     }
@@ -596,9 +633,9 @@ async function renderB(){
     const dd=getOverdueDueDate(t); if(!dd) return;
     const key=`${t.id}_${dd}`;
     if(_promptedReasons.has(key)) return;
-    if(recentC.some(c=>c.task_id===t.id&&c.status==='skip'&&c.date===dd&&c.reason)) return;
+    if(recentC.some(c=>c.task_id===t.id&&(c.status==='done'||(c.status==='skip'&&c.reason))&&c.date===dd)) return;
     _promptedReasons.add(key);
-    setTimeout(()=>openReasonSheetForTask(t,dd),600);
+    setTimeout(()=>openStrictOpts(t.id,'reason',dd),600);
   });
 
   const allDisplay=[...overdueTasks,...dueToday];
@@ -614,9 +651,9 @@ async function renderB(){
       ?`<span class="kinder-day-badge">${DAY_BADGE[t.day_of_week]}</span>`:'';
     const overdueBadge=isOverdue?`<span class="overdue-tag">Überfällig</span>`:'';
     const skipReason=isSkip&&c.reason?`<span class="reason-tag" title="${c.reason}">💬 ${c.reason}</span>`:'';
-    // "Nicht erledigt"-Button: bei Pflichtaufgaben solange kein Grund hinterlegt
-    const nichtBtn=t.is_strict&&!isDone&&!(isSkip&&c.reason)
-      ?`<button class="reason-btn" onclick="openReasonForToday('${t.id}');event.stopPropagation()">Nicht erledigt</button>`:'';
+    // Optionen-Button: bei Pflichtaufgaben (solange nicht erledigt oder kein Grund hinterlegt)
+    const nichtBtn=t.is_strict&&!isDone&&!(isSkip&&c&&c.reason)
+      ?`<button class="reason-btn" onclick="openStrictOpts('${t.id}','${isOverdue?'done':'reason'}');event.stopPropagation()">Optionen ⋯</button>`:'';
     rows+=`<div class="task-row ${isDone?'done':isSkip?'skip':isOverdue?'overdue':''}" onclick="toggle('${t.id}')">
       <div class="check">${isDone?'✓':isSkip?'⊘':''}</div>
       <div class="task-label" style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">${t.text}${dayBadge}${overdueBadge}</div>
@@ -635,30 +672,116 @@ async function renderB(){
     <div class="task-list-wrap"><div class="task-card">${rows||'<div style="padding:20px;text-align:center;color:var(--text-2);font-size:.9rem">Keine Aufgaben heute</div>'}</div></div>`;
 }
 
-// ── Grund-Sheet (Pflichtaufgabe) ──────────────────────────
-function openReasonForToday(taskId){
+// ── Optionen-Sheet (Pflichtaufgaben) ──────────────────────
+// defaultTab: 'done' | 'move' | 'reason'
+// overrideDueDate: optionaler ISO-String für den überfälligen Tag
+function openStrictOpts(taskId, defaultTab, overrideDueDate){
   const t=allTasks.find(x=>x.id===taskId); if(!t) return;
-  _pendingReason={taskId,dueDate:today()};
-  document.getElementById('reasonTitle').textContent=t.text;
-  document.getElementById('reasonSub').textContent='Heute nicht erledigt – Grund:';
-  document.getElementById('reasonInput').value='';
-  document.getElementById('overlayReason').style.display='flex';
+  const dd=overrideDueDate||getOverdueDueDate(t)||today();
+  _pendingStrict={taskId, dueDate:dd};
+
+  document.getElementById('strictOptsTitle').textContent=t.text;
+  const dObj=new Date(dd+'T12:00:00');
+  const isTod=dd===today();
+  document.getElementById('strictOptsSub').textContent=
+    isTod ? 'Heute fällig' : `Fällig war: ${dObj.getDate()}.${dObj.getMonth()+1}.${dObj.getFullYear()}`;
+
+  // Datum-Voreinstellungen
+  const todStr=today();
+  const doneInput=document.getElementById('strictDoneDate');
+  doneInput.value=dd; doneInput.max=todStr;
+  const tomorrow=new Date(); tomorrow.setDate(tomorrow.getDate()+1);
+  const moveInput=document.getElementById('strictMoveDate');
+  moveInput.value=''; moveInput.min=tomorrow.toISOString().split('T')[0];
+  document.getElementById('strictReasonText').value='';
+
+  showStrictTab(defaultTab||'done');
+  document.getElementById('overlayStrictOpts').style.display='flex';
 }
-function openReasonSheetForTask(t,dueDate){
-  _pendingReason={taskId:t.id,dueDate};
-  const d=new Date(dueDate+'T12:00:00');
-  document.getElementById('reasonTitle').textContent=t.text;
-  document.getElementById('reasonSub').textContent=`Nicht erledigt am ${d.getDate()}.${d.getMonth()+1}. – Warum?`;
-  document.getElementById('reasonInput').value='';
-  document.getElementById('overlayReason').style.display='flex';
+
+function showStrictTab(tab){
+  ['done','move','reason'].forEach(k=>{
+    const key=k.charAt(0).toUpperCase()+k.slice(1);
+    document.getElementById('strictTab'+key).style.display=tab===k?'flex':'none';
+    document.getElementById('tab'+key+'Btn').classList.toggle('active',tab===k);
+  });
 }
-async function submitReason(){
-  if(!_pendingReason) return;
-  const reason=document.getElementById('reasonInput').value.trim();
-  if(!reason){document.getElementById('reasonInput').focus();return;}
-  const {taskId,dueDate}=_pendingReason;
-  document.getElementById('overlayReason').style.display='none';
-  _pendingReason=null;
+
+function closeStrictOpts(e){
+  if(!e||e.target===document.getElementById('overlayStrictOpts')){
+    document.getElementById('overlayStrictOpts').style.display='none';
+    _pendingStrict=null;
+  }
+}
+
+// Tab 1: Nachträglich als erledigt markieren
+async function submitStrictDone(){
+  if(!_pendingStrict) return;
+  const date=document.getElementById('strictDoneDate').value;
+  if(!date){document.getElementById('strictDoneDate').focus();return;}
+  const {taskId}=_pendingStrict;
+  document.getElementById('overlayStrictOpts').style.display='none';
+  _pendingStrict=null;
+
+  // Eintrag anlegen oder aktualisieren
+  const {data:existing}=await db.from('completions').select('*').eq('task_id',taskId).eq('date',date).maybeSingle();
+  if(existing){
+    await db.from('completions').update({status:'done',done_by:user||'?',reason:null}).eq('id',existing.id);
+  } else {
+    await db.from('completions').insert({task_id:taskId,date,done_by:user||'?',status:'done'});
+  }
+
+  // Wenn das eingetragene Datum heute ist → todayC aktualisieren
+  if(date===today()){
+    todayC=todayC.filter(c=>c.task_id!==taskId);
+    const {data}=await db.from('completions').select('*').eq('task_id',taskId).eq('date',date).maybeSingle();
+    if(data) todayC.push(data);
+  }
+
+  // next_due_date anpassen
+  const task=allTasks.find(t=>t.id===taskId);
+  if(task){
+    if(task.recurrence_days&&task.next_due_date){
+      const nd=new Date(date+'T12:00:00'); nd.setDate(nd.getDate()+task.recurrence_days);
+      const ndStr=nd.toISOString().split('T')[0];
+      await db.from('tasks').update({next_due_date:ndStr}).eq('id',taskId);
+      task.next_due_date=ndStr;
+    } else if(task.next_due_date&&!task.recurrence_days){
+      await db.from('tasks').update({next_due_date:null}).eq('id',taskId);
+      task.next_due_date=null;
+    }
+  }
+
+  window._recentBC=await loadRecentBCompletions();
+  if(currentList==='b'&&tab==='h') await renderB();
+}
+
+// Tab 2: Auf anderen Tag verschieben
+async function submitStrictMove(){
+  if(!_pendingStrict) return;
+  const date=document.getElementById('strictMoveDate').value;
+  if(!date){document.getElementById('strictMoveDate').focus();return;}
+  const {taskId}=_pendingStrict;
+  document.getElementById('overlayStrictOpts').style.display='none';
+  _pendingStrict=null;
+
+  const task=allTasks.find(t=>t.id===taskId);
+  await db.from('tasks').update({next_due_date:date}).eq('id',taskId);
+  if(task) task.next_due_date=date;
+
+  window._recentBC=await loadRecentBCompletions();
+  if(currentList==='b'&&tab==='h') await renderB();
+}
+
+// Tab 3: Begründung für Nichterledigung
+async function submitStrictReason(){
+  if(!_pendingStrict) return;
+  const reason=document.getElementById('strictReasonText').value.trim();
+  if(!reason){document.getElementById('strictReasonText').focus();return;}
+  const {taskId,dueDate}=_pendingStrict;
+  document.getElementById('overlayStrictOpts').style.display='none';
+  _pendingStrict=null;
+
   const {data:existing}=await db.from('completions').select('id').eq('task_id',taskId).eq('date',dueDate).maybeSingle();
   if(existing){
     await db.from('completions').update({status:'skip',reason,done_by:user||'?'}).eq('id',existing.id);
@@ -667,12 +790,6 @@ async function submitReason(){
   }
   window._recentBC=await loadRecentBCompletions();
   if(currentList==='b'&&tab==='h') await renderB();
-}
-function closeReasonSheet(e){
-  if(!e||e.target===document.getElementById('overlayReason')){
-    document.getElementById('overlayReason').style.display='none';
-    _pendingReason=null;
-  }
 }
 
 // ── Render: Monatskalender B ──────────────────────────────
