@@ -149,6 +149,50 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI'
 .wdot-skip { background: #007AFF18; color: #007AFF; font-size: 0.9rem; }
 .wdot-skip-mini { background: #007AFF18; color: #007AFF; font-size: 0.72rem; }
 
+/* ── PFLICHTAUFGABEN / ÜBERFÄLLIG (B-Liste) ── */
+.task-row.overdue { background: #FF3B3006; }
+.overdue-tag { font-size: 0.65rem; font-weight: 700; color: #FF3B30; background: #FF3B3015; padding: 2px 7px; border-radius: 99px; flex-shrink: 0; white-space: nowrap; }
+.reason-btn { font-size: 0.7rem; font-weight: 600; color: var(--text-2); background: var(--gray-light); border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; cursor: pointer; flex-shrink: 0; white-space: nowrap; }
+.reason-btn:active { opacity: .7; }
+.reason-tag { font-size: 0.67rem; color: var(--text-2); background: var(--gray-light); padding: 2px 8px; border-radius: 99px; font-style: italic; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── KALENDER MONATSÜBERSICHT (B) ── */
+.cal-wrap { padding: 0 14px 8px; }
+.cal-nav { display: flex; align-items: center; justify-content: space-between; padding: 4px 4px 12px; }
+.cal-label { font-size: 0.9rem; font-weight: 700; text-align: center; flex: 1; }
+.cal-nav-btn { padding: 7px 14px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--card); font-size: 0.82rem; font-weight: 600; color: var(--blue); cursor: pointer; }
+.cal-nav-btn:disabled { color: var(--gray); border-color: var(--gray-light); cursor: default; }
+.cal-grid { background: var(--card); border-radius: var(--r); overflow: hidden; }
+.cal-dow-row { display: grid; grid-template-columns: repeat(7, 1fr); background: var(--gray-light); border-bottom: 1px solid var(--border); }
+.cal-dow-cell { text-align: center; font-size: 0.62rem; font-weight: 700; color: var(--text-2); padding: 5px 0; text-transform: uppercase; }
+.cal-days-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+.cal-day { min-height: 48px; padding: 4px 3px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); cursor: pointer; transition: background .1s; }
+.cal-day:nth-child(7n) { border-right: none; }
+.cal-day:active:not(.empty-day):not(.future-day) { background: var(--gray-light); }
+.cal-day.empty-day { background: var(--gray-light); cursor: default; }
+.cal-day.today-day { background: #007AFF08; }
+.cal-day.future-day { opacity: .4; cursor: default; pointer-events: none; }
+.cal-day-num { font-size: 0.7rem; font-weight: 600; color: var(--text-2); line-height: 1; }
+.cal-day.today-day .cal-day-num { color: var(--blue); font-weight: 800; }
+.cal-day-dots { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 3px; }
+.cal-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.cal-dot.done { background: #00C7BE; }
+.cal-dot.skip { background: #007AFF55; }
+.cal-legend { display: flex; gap: 14px; padding: 10px 4px 4px; font-size: 0.73rem; color: var(--text-2); flex-wrap: wrap; }
+.cal-leg-item { display: flex; align-items: center; gap: 5px; }
+.cal-detail-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.42); z-index: 300; display: flex; align-items: flex-end; }
+.cal-detail-sheet { background: var(--card); border-radius: 22px 22px 0 0; padding: 22px 20px calc(24px + var(--safe-b)); width: 100%; max-height: 65vh; overflow-y: auto; animation: slideUp .22s ease; }
+.cal-detail-date { font-size: 0.85rem; font-weight: 700; color: var(--text-2); margin-bottom: 14px; }
+.cal-detail-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.cal-detail-row:last-child { border-bottom: none; }
+.cal-detail-icon { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: .72rem; color: white; font-weight: 700; margin-top: 1px; }
+.cal-detail-icon.done { background: #00C7BE; }
+.cal-detail-icon.skip { background: #007AFF44; color: #007AFF; }
+.cal-detail-text { flex: 1; font-size: 0.88rem; line-height: 1.3; }
+.cal-detail-reason { font-size: 0.75rem; color: var(--text-2); margin-top: 3px; font-style: italic; }
+.cal-detail-meta { font-size: 0.72rem; color: var(--text-2); margin-top: 2px; }
+.cal-detail-close { display: block; width: 100%; margin-top: 14px; padding: 12px; background: var(--gray-light); border: none; border-radius: 12px; font-size: .9rem; font-weight: 500; color: var(--text-2); cursor: pointer; }
+
 /* ── STATS VIEW ── */
 .stats-wrap { padding: 0 14px 8px; }
 .period-row { display: flex; gap: 8px; padding: 6px 4px 12px; }
@@ -220,6 +264,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI'
   </div>
 </div>
 
+<!-- Grund-Eingabe (Pflichtaufgabe nicht erledigt) -->
+<div class="overlay" id="overlayReason" style="display:none" onclick="closeReasonSheet(event)">
+  <div class="sheet">
+    <h2 id="reasonTitle">Nicht erledigt</h2>
+    <p id="reasonSub" style="font-size:.85rem;color:var(--text-2);margin-bottom:16px"></p>
+    <div class="sheet-form">
+      <textarea class="sheet-input" id="reasonInput" placeholder="Kurze Begründung …" rows="3" style="resize:none;min-height:80px;font-family:inherit"></textarea>
+      <button class="sheet-submit" onclick="submitReason()">Speichern</button>
+      <button class="sheet-cancel" onclick="document.getElementById('overlayReason').style.display='none';_pendingReason=null">Später</button>
+    </div>
+  </div>
+</div>
+
 <!-- Aufgabe hinzufügen -->
 <div class="overlay" id="overlayTask" style="display:none" onclick="closeTaskSheet(event)">
   <div class="sheet">
@@ -272,6 +329,9 @@ let tab         = 'h';
 let period      = 28;
 let weekOffset  = 0;
 let weekChild   = localStorage.getItem('hh_weekChild') || 'Anton';
+let calOffset   = 0;
+let _pendingReason = null;
+const _promptedReasons = new Set();
 
 const CHILDREN = ['Anton', 'Friedrich', 'Justus'];
 const CHILD_COLORS = { Anton: 'var(--blue)', Friedrich: 'var(--orange)', Justus: 'var(--purple)' };
@@ -287,6 +347,31 @@ function todayDow() { return new Date().getDay(); }
 function fmtDate(d) { return `${DE_DL[d.getDay()]}, ${d.getDate()}. ${DE_M[d.getMonth()]}`; }
 function isWeekend(ds) { const d = ds ? new Date(ds+'T12:00:00') : new Date(); return d.getDay()===0||d.getDay()===6; }
 function filteredTasks() { return allTasks.filter(t => t.list_name === currentList); }
+
+// ── B-Liste Hilfsfunktionen ───────────────────────────────
+function getMostRecentDow(dow) {
+  const d=new Date(), diff=(d.getDay()-dow+7)%7;
+  const r=new Date(d); r.setDate(d.getDate()-diff);
+  return r.toISOString().split('T')[0];
+}
+function isTaskDueForB(t) {
+  if(t.next_due_date!=null) return today()>=t.next_due_date;
+  if(t.day_of_week!==null) return t.day_of_week===todayDow();
+  return true;
+}
+function getOverdueDueDate(t) {
+  if(t.next_due_date!=null&&today()>=t.next_due_date) return t.next_due_date;
+  if(t.day_of_week!==null){ const rd=getMostRecentDow(t.day_of_week); return rd<today()?rd:null; }
+  return null;
+}
+function getOverdueBTasks(recentC) {
+  return allTasks.filter(t=>{
+    if(t.list_name!=='b'||!t.is_strict) return false;
+    const dd=getOverdueDueDate(t);
+    if(!dd) return false;
+    return !recentC.some(c=>c.task_id===t.id&&c.status==='done'&&c.date>=dd);
+  });
+}
 
 function weekDates(offset) {
   const off = offset !== undefined ? offset : weekOffset;
@@ -317,6 +402,26 @@ async function loadWeek() {
   const {data,error} = await db.from('completions').select('*').gte('date',wd[0]).lte('date',wd[6]);
   if(error) throw error; return data||[];
 }
+async function loadRecentBCompletions() {
+  const bIds=allTasks.filter(t=>t.list_name==='b').map(t=>t.id);
+  if(!bIds.length) return [];
+  const start=new Date(); start.setDate(start.getDate()-14);
+  const {data,error}=await db.from('completions').select('*')
+    .in('task_id',bIds).gte('date',start.toISOString().split('T')[0]).lte('date',today());
+  return error?[]:(data||[]);
+}
+async function loadCalendarMonth(year,month) { // month 0-indexed
+  const m1=String(month+1).padStart(2,'0');
+  const start=`${year}-${m1}-01`;
+  const days=new Date(year,month+1,0).getDate();
+  const end=`${year}-${m1}-${String(days).padStart(2,'0')}`;
+  const bIds=allTasks.filter(t=>t.list_name==='b').map(t=>t.id);
+  if(!bIds.length) return [];
+  const {data,error}=await db.from('completions').select('*')
+    .in('task_id',bIds).gte('date',start).lte('date',end);
+  return error?[]:(data||[]);
+}
+
 async function loadStats() {
   const end = today(), start = new Date();
   start.setDate(start.getDate()-period);
@@ -344,7 +449,20 @@ async function toggle(taskId) {
   if(existing) await db.from('completions').delete().eq('id',existing.id);
   if(newStatus){
     const {data}=await db.from('completions').insert({task_id:taskId,date:today(),done_by:user,status:newStatus}).select().single();
-    if(data){ todayC=todayC.filter(c=>c.id!=='_tmp'); todayC.push(data); }
+    if(data){
+      todayC=todayC.filter(c=>c.id!=='_tmp'); todayC.push(data);
+      // Zweiwöchentliche Aufgabe (Rasenmähen): next_due_date vorrücken
+      if(newStatus==='done'){
+        const task=allTasks.find(t=>t.id===taskId);
+        if(task&&task.recurrence_days&&task.next_due_date){
+          const nd=new Date(today()+'T12:00:00');
+          nd.setDate(nd.getDate()+task.recurrence_days);
+          const ndStr=nd.toISOString().split('T')[0];
+          await db.from('tasks').update({next_due_date:ndStr}).eq('id',taskId);
+          task.next_due_date=ndStr;
+        }
+      }
+    }
   }
 }
 
@@ -388,7 +506,11 @@ function refreshToggle(){ document.getElementById('btnE').classList.toggle('acti
 // ── List ──────────────────────────────────────────────────
 function setList(list) {
   currentList=list; localStorage.setItem('hh_list',list);
-  renderCurrentTab();
+  if(list==='b'&&tab==='h'){
+    loadRecentBCompletions().then(rc=>{ window._recentBC=rc; renderB(); });
+  } else {
+    renderCurrentTab();
+  }
 }
 
 function listToggleHTML() {
@@ -411,13 +533,15 @@ function renderCurrentTab(){ renderTab(); }
 async function renderTab(){
   if(tab==='h'){
     if(currentList==='kinder') renderKinder();
+    else if(currentList==='b') await renderB();
     else renderToday();
   } else if(tab==='w'){
     showLoading(); const d=await loadWeek().catch(()=>[]); renderWeek(d);
   } else if(tab==='e'){
     showLoading(); const d=await loadShopping().catch(()=>[]); window._shopItems=d; renderShop(d);
   } else {
-    showLoading(); const d=await loadStats().catch(()=>[]); renderStats(d);
+    if(currentList==='b'){ calOffset=0; await renderBCalendar(); }
+    else { showLoading(); const d=await loadStats().catch(()=>[]); renderStats(d); }
   }
 }
 function showLoading(){ document.getElementById('content').innerHTML='<div class="loading"><div class="spin"></div></div>'; }
@@ -452,6 +576,193 @@ function renderToday(){
     </div>
     <div class="section-label"><span>Aufgaben heute</span><button class="section-label-btn" onclick="openAddTask()">+ Aufgabe</button></div>
     <div class="task-list-wrap"><div class="task-card">${rows||'<div style="padding:20px;text-align:center;color:var(--text-2);font-size:.9rem">Keine Aufgaben</div>'}</div></div>`;
+}
+
+// ── Render: B-Liste ───────────────────────────────────────
+async function renderB(){
+  const el=document.getElementById('content');
+  const recentC=window._recentBC||[];
+  const bTasks=allTasks.filter(t=>t.list_name==='b');
+  const handledSet=new Set(todayC.map(c=>c.task_id));
+  const DAY_BADGE={2:'Di',3:'Mi',5:'Fr',6:'Sa'};
+
+  // Aufgaben die heute fällig sind
+  const dueToday=bTasks.filter(t=>isTaskDueForB(t));
+  // Überfällige Pflichtaufgaben (fällig war ein vergangener Tag, noch nicht erledigt)
+  const overdueTasks=getOverdueBTasks(recentC).filter(t=>!dueToday.find(d=>d.id===t.id));
+
+  // Für überfällige Aufgaben ohne Begründung → einmalig pro Session prompt
+  overdueTasks.forEach(t=>{
+    const dd=getOverdueDueDate(t); if(!dd) return;
+    const key=`${t.id}_${dd}`;
+    if(_promptedReasons.has(key)) return;
+    if(recentC.some(c=>c.task_id===t.id&&c.status==='skip'&&c.date===dd&&c.reason)) return;
+    _promptedReasons.add(key);
+    setTimeout(()=>openReasonSheetForTask(t,dd),600);
+  });
+
+  const allDisplay=[...overdueTasks,...dueToday];
+  const handled=allDisplay.filter(t=>handledSet.has(t.id)).length, total=allDisplay.length;
+  const pct=total?Math.round(handled/total*100):0;
+
+  let rows='';
+  allDisplay.forEach(t=>{
+    const isOverdue=overdueTasks.some(o=>o.id===t.id);
+    const c=todayC.find(x=>x.task_id===t.id);
+    const isDone=c&&c.status==='done', isSkip=c&&c.status==='skip';
+    const dayBadge=t.day_of_week!==null&&t.next_due_date==null&&DAY_BADGE[t.day_of_week]
+      ?`<span class="kinder-day-badge">${DAY_BADGE[t.day_of_week]}</span>`:'';
+    const overdueBadge=isOverdue?`<span class="overdue-tag">Überfällig</span>`:'';
+    const skipReason=isSkip&&c.reason?`<span class="reason-tag" title="${c.reason}">💬 ${c.reason}</span>`:'';
+    // "Nicht erledigt"-Button: bei Pflichtaufgaben solange kein Grund hinterlegt
+    const nichtBtn=t.is_strict&&!isDone&&!(isSkip&&c.reason)
+      ?`<button class="reason-btn" onclick="openReasonForToday('${t.id}');event.stopPropagation()">Nicht erledigt</button>`:'';
+    rows+=`<div class="task-row ${isDone?'done':isSkip?'skip':isOverdue?'overdue':''}" onclick="toggle('${t.id}')">
+      <div class="check">${isDone?'✓':isSkip?'⊘':''}</div>
+      <div class="task-label" style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">${t.text}${dayBadge}${overdueBadge}</div>
+      ${isDone?`<span class="task-badge ${c.done_by}">${c.done_by}</span>`:''}
+      ${isSkip?(skipReason||'<span class="task-badge skip-badge">–</span>'):''}
+      ${nichtBtn}
+    </div>`;
+  });
+
+  el.innerHTML=`${listToggleHTML()}
+    <div class="progress-wrap">
+      <div class="progress-meta"><span><strong>${handled}</strong> von ${total} erledigt</span><span>${pct}%</span></div>
+      <div class="pbar-bg"><div class="pbar-fill" style="width:${pct}%;background:#00C7BE"></div></div>
+    </div>
+    <div class="section-label"><span>B – Heute</span><button class="section-label-btn" onclick="openAddTask()">+ Aufgabe</button></div>
+    <div class="task-list-wrap"><div class="task-card">${rows||'<div style="padding:20px;text-align:center;color:var(--text-2);font-size:.9rem">Keine Aufgaben heute</div>'}</div></div>`;
+}
+
+// ── Grund-Sheet (Pflichtaufgabe) ──────────────────────────
+function openReasonForToday(taskId){
+  const t=allTasks.find(x=>x.id===taskId); if(!t) return;
+  _pendingReason={taskId,dueDate:today()};
+  document.getElementById('reasonTitle').textContent=t.text;
+  document.getElementById('reasonSub').textContent='Heute nicht erledigt – Grund:';
+  document.getElementById('reasonInput').value='';
+  document.getElementById('overlayReason').style.display='flex';
+}
+function openReasonSheetForTask(t,dueDate){
+  _pendingReason={taskId:t.id,dueDate};
+  const d=new Date(dueDate+'T12:00:00');
+  document.getElementById('reasonTitle').textContent=t.text;
+  document.getElementById('reasonSub').textContent=`Nicht erledigt am ${d.getDate()}.${d.getMonth()+1}. – Warum?`;
+  document.getElementById('reasonInput').value='';
+  document.getElementById('overlayReason').style.display='flex';
+}
+async function submitReason(){
+  if(!_pendingReason) return;
+  const reason=document.getElementById('reasonInput').value.trim();
+  if(!reason){document.getElementById('reasonInput').focus();return;}
+  const {taskId,dueDate}=_pendingReason;
+  document.getElementById('overlayReason').style.display='none';
+  _pendingReason=null;
+  const {data:existing}=await db.from('completions').select('id').eq('task_id',taskId).eq('date',dueDate).maybeSingle();
+  if(existing){
+    await db.from('completions').update({status:'skip',reason,done_by:user||'?'}).eq('id',existing.id);
+  } else {
+    await db.from('completions').insert({task_id:taskId,date:dueDate,done_by:user||'?',status:'skip',reason});
+  }
+  window._recentBC=await loadRecentBCompletions();
+  if(currentList==='b'&&tab==='h') await renderB();
+}
+function closeReasonSheet(e){
+  if(!e||e.target===document.getElementById('overlayReason')){
+    document.getElementById('overlayReason').style.display='none';
+    _pendingReason=null;
+  }
+}
+
+// ── Render: Monatskalender B ──────────────────────────────
+async function renderBCalendar(){
+  const el=document.getElementById('content');
+  showLoading();
+  const now=new Date(); now.setMonth(now.getMonth()+calOffset);
+  const year=now.getFullYear(), month=now.getMonth(); // 0-indexed
+  const data=await loadCalendarMonth(year,month);
+  const bTasks=allTasks.filter(t=>t.list_name==='b');
+  const bTaskIds=new Set(bTasks.map(t=>t.id));
+  const dayMap={};
+  data.filter(c=>bTaskIds.has(c.task_id)).forEach(c=>{
+    const d=parseInt(c.date.split('-')[2]);
+    if(!dayMap[d]) dayMap[d]=[];
+    dayMap[d].push(c);
+  });
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  const firstDow=new Date(year,month,1).getDay();
+  const startOffset=firstDow===0?6:firstDow-1; // Montag=0
+  const todayNow=new Date();
+  const isCurMonth=year===todayNow.getFullYear()&&month===todayNow.getMonth();
+  let daysHtml='';
+  for(let i=0;i<startOffset;i++) daysHtml+=`<div class="cal-day empty-day"></div>`;
+  for(let d=1;d<=daysInMonth;d++){
+    const isToday=isCurMonth&&d===todayNow.getDate();
+    const isFuture=isCurMonth&&d>todayNow.getDate();
+    const comps=dayMap[d]||[];
+    const dots=comps.map(c=>`<div class="cal-dot ${c.status==='done'?'done':'skip'}"></div>`).join('');
+    daysHtml+=`<div class="cal-day ${isToday?'today-day':''} ${isFuture?'future-day':''}"
+      onclick="showCalDetail(${year},${month},${d})">
+      <div class="cal-day-num">${d}</div>
+      <div class="cal-day-dots">${dots}</div>
+    </div>`;
+  }
+  el.innerHTML=`${listToggleHTML()}
+    <div class="section-label"><span>Monatsübersicht B</span></div>
+    <div class="cal-wrap">
+      <div class="cal-nav">
+        <button class="cal-nav-btn" onclick="changeCalMonth(-1)">← Zurück</button>
+        <span class="cal-label">${DE_M[month]} ${year}</span>
+        <button class="cal-nav-btn" onclick="changeCalMonth(1)" ${calOffset>=0?'disabled':''}>Vor →</button>
+      </div>
+      <div class="cal-grid">
+        <div class="cal-dow-row">${['Mo','Di','Mi','Do','Fr','Sa','So'].map(d=>`<div class="cal-dow-cell">${d}</div>`).join('')}</div>
+        <div class="cal-days-grid">${daysHtml}</div>
+      </div>
+      <div class="cal-legend">
+        <div class="cal-leg-item"><div class="cal-dot done"></div>Erledigt</div>
+        <div class="cal-leg-item"><div class="cal-dot skip"></div>Übersprungen / Begründet</div>
+      </div>
+    </div>`;
+  window._calData={year,month,data,bTasks};
+}
+function showCalDetail(year,month,day){
+  if(!window._calData) return;
+  const {data,bTasks}=window._calData;
+  const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+  const comps=data.filter(c=>c.date===dateStr);
+  const d=new Date(dateStr+'T12:00:00');
+  let rows='';
+  comps.forEach(c=>{
+    const t=bTasks.find(x=>x.id===c.task_id); if(!t) return;
+    const isDone=c.status==='done';
+    rows+=`<div class="cal-detail-row">
+      <div class="cal-detail-icon ${isDone?'done':'skip'}">${isDone?'✓':'⊘'}</div>
+      <div class="cal-detail-text">
+        <div>${t.text}</div>
+        ${c.reason?`<div class="cal-detail-reason">💬 ${c.reason}</div>`:''}
+        ${c.done_by&&c.done_by!=='?'?`<div class="cal-detail-meta">von ${c.done_by}</div>`:''}
+      </div>
+    </div>`;
+  });
+  if(!rows) rows=`<div style="padding:16px 0;text-align:center;color:var(--text-2);font-size:.87rem">Keine Einträge</div>`;
+  document.getElementById('content').insertAdjacentHTML('beforeend',`
+    <div class="cal-detail-overlay" id="calDetailOverlay" onclick="closeCalDetail(event)">
+      <div class="cal-detail-sheet">
+        <div class="cal-detail-date">${fmtDate(d)}</div>
+        ${rows}
+        <button class="cal-detail-close" onclick="closeCalDetail()">Schließen</button>
+      </div>
+    </div>`);
+}
+function closeCalDetail(e){
+  const ov=document.getElementById('calDetailOverlay');
+  if(!e||e.target===ov) ov&&ov.remove();
+}
+async function changeCalMonth(dir){
+  if(dir>0&&calOffset>=0) return;
+  calOffset+=dir; await renderBCalendar();
 }
 
 function openAddTask(){
@@ -727,13 +1038,16 @@ async function init(){
   try {
     await loadTasks();
     await loadToday();
+    if(currentList==='b') window._recentBC=await loadRecentBCompletions().catch(()=>[]);
   } catch(e){
     const msg = e?.message || e?.details || JSON.stringify(e) || 'Unbekannter Fehler';
     document.getElementById('content').innerHTML=`<div class="loading"><span style="font-size:2rem">⚠️</span><span>Verbindungsfehler – bitte Internetverbindung prüfen.<br><small style="opacity:.6;font-size:.75rem">${msg}</small></span><button onclick="init()" style="margin-top:14px;padding:10px 24px;border-radius:10px;border:none;background:var(--blue);color:white;font-size:.9rem;font-weight:600">Erneut versuchen</button></div>`;
     return;
   }
   try {
-    if(currentList==='kinder') renderKinder(); else renderToday();
+    if(currentList==='kinder') renderKinder();
+    else if(currentList==='b') await renderB();
+    else renderToday();
   } catch(e){
     const msg = e?.message || String(e);
     document.getElementById('content').innerHTML=`<div class="loading"><span style="font-size:2rem">⚠️</span><span>Anzeigefehler.<br><small style="opacity:.6;font-size:.75rem">${msg}</small></span><button onclick="init()" style="margin-top:14px;padding:10px 24px;border-radius:10px;border:none;background:var(--blue);color:white;font-size:.9rem;font-weight:600">Erneut versuchen</button></div>`;
