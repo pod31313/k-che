@@ -537,7 +537,7 @@ function renderEinkauf(){
   if(!S.shop.length) h+='<div class="empty">Einkaufsliste ist leer</div>';
   const nb=S.shop.filter(x=>x.bought).length;
   h+=`<div class="label">Artikel hinzufügen ${nb?`<button class="btn small" onclick="clearBought()">${nb} Gekaufte entfernen</button>`:''}</div>
-     <div class="addform"><input id="shopQty" class="inp" value="1×"><select id="shopCat" class="inp">${CATS.map(c=>`<option ${c===(S._shopCat||'Lebensmittel')?'selected':''}>${c}</option>`).join('')}</select>
+     <div class="addform"><select id="shopQty" class="inp">${Array.from({length:10},(_,i)=>`<option>${i+1}×</option>`).join('')}</select><select id="shopCat" class="inp">${CATS.map(c=>`<option ${c===(S._shopCat||'Lebensmittel')?'selected':''}>${c}</option>`).join('')}</select>
      <div class="addrow full"><input id="shopText" class="inp" placeholder="Artikel …" onkeydown="if(event.key==='Enter')addShop()"><button class="btn primary" onclick="addShop()">Hinzufügen</button></div></div>
      <div class="ws-sub" style="padding:8px 4px">Antippen markiert als gekauft.</div>`;
   return h;
