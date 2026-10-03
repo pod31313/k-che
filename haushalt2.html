@@ -308,7 +308,9 @@ async function setComp(taskId,d,status,extra={}){
       const r=await db.from('completions').delete().eq('task_id',taskId).eq('date',d); if(r.error) throw r.error; return; }
     const row={task_id:taskId,date:d,status,done_by:S.user||'?',reason:null,child_name:extra.child_name??null};
     S.comp.set(key,{...(prev||{}),...row}); render();
-    const r=await db.from('completions').upsert(row,{onConflict:'task_id,date'}).select().single();
+    // löschen + neu anlegen statt upsert: die RLS-Regeln erlauben kein UPDATE auf completions
+    { const d1=await db.from('completions').delete().eq('task_id',taskId).eq('date',d); if(d1.error) throw d1.error; }
+    const r=await db.from('completions').insert(row).select().single();
     if(r.error) throw r.error; S.comp.set(key,r.data);
   }catch(e){ if(prev) S.comp.set(key,prev); else S.comp.delete(key); fail(e); }
 }
@@ -393,8 +395,8 @@ function renderHeute(){
           const lab=`${t.child_name}${KIDS.includes(t.child_name)&&hc.filter(x=>x.child_name===t.child_name).length>1?' · '+t.text:''}`;
           return `<div class="chip ${st}" onclick="cycleTask('${sid(t.id)}')" style="${st==='done'?'':'border-left:4px solid '+KCOL[t.child_name]}"><span class="dot">${st==='done'?'✓':st==='skip'?'⊘':''}</span>${esc(lab)}${st==='done'?` <span class="badge ${esc(c.done_by)}">${esc(c.done_by)}</span>`:''}</div>`;}).join('')+`</div></div>`;
     }
-    h+=renderWochenstatus();
     h+=`<div class="label">Aufgaben heute</div><div class="card">${taskRows(tasks)}</div>`;
+    h+=renderWochenstatus();
   } else if(S.list==='abend'){
     const tasks=byList('abend').filter(t=>onDay(t,d));
     h+=progress(tasks.filter(t=>comp(t.id,d)?.status==='done').length,tasks.filter(t=>comp(t.id,d)?.status!=='skip').length,'var(--purple)');
