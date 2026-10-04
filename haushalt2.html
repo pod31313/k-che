@@ -114,6 +114,14 @@ button{font:inherit;color:inherit}
 .lg{width:13px;height:13px;border-radius:50%;display:inline-block;border:1.5px solid var(--gray-mid)}
 
 /* Woche */
+.lnk{border:none;background:none;color:var(--blue);font-weight:600;font-size:.8rem;cursor:pointer;padding:2px 4px}
+.logline{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.loglist{margin-top:4px}
+.logitem{font-size:.82rem;padding:6px 0;border-top:1px solid var(--border)}
+.logitem:first-child{border-top:none}
+.ws.due-hl{background:#FF95000f;box-shadow:inset 4px 0 0 var(--orange)}
+.ws.late-hl{background:#FF3B300b;box-shadow:inset 4px 0 0 var(--red)}
+.dot-red{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);vertical-align:middle}
 .daynav{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;margin:8px 0 2px;border-radius:10px;background:var(--card)}
 .daynav .t{font-weight:700;font-size:.92rem;text-align:center}
 .daynav.past{background:#FF95001f;outline:1.5px solid #FF950066}
@@ -221,7 +229,7 @@ const KID=(()=>{const k=(qs.get('kind')||'').toLowerCase();return KIDS.find(x=>x
 const S={
   user:localStorage.getItem('hh_user')||'',
   view:'heute', list:localStorage.getItem('hh_list')||'haushalt',
-  day:today(), oForm:{kid:null,date:'',section:'nachmittag'},
+  day:today(), log:[], logOpen:null, logExp:{}, oForm:{kid:null,date:'',section:'nachmittag'},
   wkStart:monday(today()), wkList:'haushalt', wkKid:'Anton',
   mKid:localStorage.getItem('hh_mkid')||'Anton',
   tasks:[], comp:new Map(), kid:new Map(), weekly:new Map(), shop:[],
@@ -290,13 +298,15 @@ async function load(){
     const t0=today(); const from=[monday(addDays(t0,-MAXBACK)),S.wkStart].sort()[0]; const to=addDays([monday(t0),S.wkStart].sort()[1],6);
     S.tasks=await q(db.from('tasks').select('*').eq('active',true));
     const histIds=S.tasks.filter(t=>t.kind==='rotation'||t.kind==='interval').map(t=>t.id);
-    const [c1,k1,c2,k2,ws]=await Promise.all([
+    const [c1,k1,c2,k2,ws,lg]=await Promise.all([
       q(db.from('completions').select('*').gte('date',from).lte('date',to)),
       q(db.from('child_completions').select('*').gte('date',from).lte('date',to)),
       histIds.length?q(db.from('completions').select('*').in('task_id',histIds)):[],
       histIds.length?q(db.from('child_completions').select('*').in('task_id',histIds)):[],
-      KID?[]:q(db.from('weekly_status').select('*').in('week_start',[monday(t0),monday(addDays(t0,-MAXBACK)),S.wkStart]))
+      KID?[]:q(db.from('weekly_status').select('*').in('week_start',[monday(t0),monday(addDays(t0,-MAXBACK)),S.wkStart])),
+      KID?[]:q(db.from('log_entries').select('*').order('date',{ascending:false}).limit(400)).catch(e=>{console.warn('Logbuch:',e);return [];})
     ]);
+    S.log=lg;
     S.comp=new Map(); for(const c of [...c1,...c2]) S.comp.set(ck(c.task_id,c.date),c);
     S.kid=new Map(); for(const k of [...k1,...k2]) S.kid.set(kk(k.task_id,k.date,k.child_name),k);
     S.weekly=new Map(); for(const w of ws) S.weekly.set(`${w.week_start}|${w.key}`,w);
@@ -374,7 +384,7 @@ function render(){
 }
 function listSeg(cur,fn){
   return `<div class="seg listseg">${[['haushalt','🏠 Haushalt'],['kinder','🧒 Kinder'],['abend','🌙 Abend']].map(([k,l])=>
-    `<button class="${k} ${cur===k?'on':''}" onclick="${fn}('${k}')">${l}</button>`).join('')}</div>`;
+    `<button class="${k} ${cur===k?'on':''}" onclick="${fn}('${k}')">${l}${k==='haushalt'&&cur!=='haushalt'&&S.user==='B'&&S.view==='heute'&&dueItems().length?' <span class="dot-red"></span>':''}</button>`).join('')}</div>`;
 }
 function progress(done,total,color){
   const pct=total?Math.round(done/total*100):0;
@@ -397,6 +407,8 @@ function renderHeute(){
     const all=[...hc,...tasks]; const done=all.filter(t=>comp(t.id,d)?.status==='done').length;
     const rel=all.filter(t=>comp(t.id,d)?.status!=='skip').length;
     h+=progress(done,rel,'var(--blue)');
+    const due=(S.user==='B'&&d===today())?dueItems():[];
+    if(due.length) h+=renderDue(due);
     if(hc.length){
       h+=`<div class="label">Morgens</div><div class="card hc"><div class="hc-q">📵 Handys über Nacht draußen?</div><div class="chips">`+
         hc.map(t=>{const c=comp(t.id,d);const st=c?c.status:'';
@@ -404,7 +416,7 @@ function renderHeute(){
           return `<div class="chip ${st}" onclick="cycleTask('${sid(t.id)}')" style="${st==='done'?'':'border-left:4px solid '+KCOL[t.child_name]}"><span class="dot">${st==='done'?'✓':st==='skip'?'⊘':''}</span>${esc(lab)}${st==='done'?` <span class="badge ${esc(c.done_by)}">${esc(c.done_by)}</span>`:''}</div>`;}).join('')+`</div></div>`;
     }
     h+=`<div class="label">Aufgaben heute</div><div class="card">${taskRows(tasks)}</div>`;
-    h+=renderWochenstatus();
+    h+=renderWochenstatus(due.filter(x=>x.wk===monday(today())).map(x=>x.key));
   } else if(S.list==='abend'){
     const tasks=byList('abend').filter(t=>onDay(t,d));
     h+=progress(tasks.filter(t=>comp(t.id,d)?.status==='done').length,tasks.filter(t=>comp(t.id,d)?.status!=='skip').length,'var(--purple)');
@@ -413,40 +425,130 @@ function renderHeute(){
   return h;
 }
 
-function renderWochenstatus(){
-  const wk=monday(cur());
-  const hf=S.weekly.get(`${wk}|hausfreitag`)||{}; const fi=S.weekly.get(`${wk}|finanz`)||{};
-  const iv=byList('intervall');
-  let h=`<div class="label">${monday(cur())===monday(today())?'Diese Woche':'Woche ab '+dm(monday(cur()))}</div><div class="card">`;
-  // Haus-Freitag
-  const tags=(hf.note||'').split(',').map(s=>s.trim()).filter(Boolean);
-  h+=`<div class="ws"><div class="ws-head"><div><div class="ws-title">🔧 Haus-Freitag</div>
-     <div class="ws-sub">${hf.status?`${esc(hf.status)}${hf.status==='verschoben'&&hf.moved_to?' auf '+dm(hf.moved_to):''} · ${esc(hf.updated_by||'')}`:'noch offen'}</div></div>
+// ═══ Wochenstatus & Logbuch ══════════════════════════════════════
+const LOGK={hausfreitag:'🔧 Haus-Freitag',finanz:'💶 Finanz-Termin',rasen:'🌱 Rasenmähen'};
+const logOf=(k,d)=>S.log.find(e=>e.key===k&&e.date===d);
+const logsOf=k=>S.log.filter(e=>e.key===k).sort((a,b)=>b.date.localeCompare(a.date));
+const wsOf=(k,wk)=>S.weekly.get(`${wk}|${k}`)||{};
+const wkDay=(d,n)=>addDays(monday(d),n);   // 0=Mo … 6=So
+const tagsHtml=t=>(t||'').split(',').map(x=>x.trim()).filter(Boolean).map(x=>`<span class="tag">${esc(x)}</span>`).join('');
+const logLine=e=>`<div class="logitem"><b>${WD[dow(e.date)]} ${dm(e.date)}</b> · ${esc(e.status||'')}${e.text?': ':''}${esc(e.text||'')}</div>`;
+
+// Erinnerungen: nur für B, nur in der Heute-Ansicht
+function dueItems(){
+  const t=today(), min=addDays(t,-MAXBACK), out=[];
+  for(const wk of [monday(addDays(t,-7)),monday(t)]){
+    const fi=wsOf('finanz',wk), fd=wkDay(wk,1);
+    if(!fi.status&&fd<=t&&fd>=min) out.push({key:'finanz',date:fd,wk});
+    const hf=wsOf('hausfreitag',wk); let hd=wkDay(wk,4); let open=hf.status!=='erledigt';
+    if(hf.status==='verschoben'){ if(hf.moved_to) hd=hf.moved_to; else open=false; }
+    if(open&&hd<=t&&hd>=min) out.push({key:'hausfreitag',date:hd,wk});
+  }
+  for(const r of byList('intervall')){ const {due}=intervalInfo(r);
+    if(due<=t&&comp(r.id,t)?.status!=='done'&&!logOf('rasen',t)) out.push({key:'rasen',date:due,wk:monday(t),task:r}); }
+  return out;
+}
+function renderDue(items){
+  const t=today(); let h=`<div class="label" style="color:var(--orange)">⏰ Fällig</div><div class="card">`;
+  for(const it of items){
+    const late=it.date<t; const when=late?`offen seit ${WD[dow(it.date)]} ${dm(it.date)}`:'heute fällig';
+    if(it.wk===monday(t)){
+      const body=it.key==='finanz'?cardFin():it.key==='hausfreitag'?cardHaus():cardRasen(it.task);
+      h+=body.replace('class="ws"',`class="ws ${late?'late-hl':'due-hl'}"`).replace('<!--WHEN-->',`<span class="${late?'overdue':'due'}"> · ${when}</span>`);
+    } else {
+      const jump=it.key==='finanz'?wkDay(it.wk,1):wkDay(it.wk,4);
+      h+=`<div class="ws late-hl"><div class="ws-head"><div><div class="ws-title">${LOGK[it.key]}</div><div class="ws-sub overdue">${when} (Vorwoche)</div></div>
+          <button class="btn small" onclick="S.day='${jump}';render();window.scrollTo(0,0)">eintragen →</button></div></div>`;
+    }
+  }
+  return h+`</div>`;
+}
+function renderWochenstatus(skip=[]){
+  const parts=[];
+  if(!skip.includes('hausfreitag')) parts.push(cardHaus());
+  if(!skip.includes('finanz')) parts.push(cardFin());
+  if(!skip.includes('rasen')) for(const t of byList('intervall')) parts.push(cardRasen(t));
+  if(!parts.length) return '';
+  return `<div class="label">${monday(cur())===monday(today())?'Diese Woche':'Woche ab '+dm(monday(cur()))}</div><div class="card">${parts.join('')}</div>`;
+}
+function cardHaus(){
+  const hf=wsOf('hausfreitag',monday(cur()));
+  const ls=hf.status==='erledigt'?'erledigt':hf.status==='verschoben'?'verschoben':null;
+  return `<div class="ws"><div class="ws-head"><div><div class="ws-title">🔧 Haus-Freitag<!--WHEN--></div>
+     <div class="ws-sub">${hf.status?`${esc(hf.status)}${hf.status==='verschoben'&&hf.moved_to?' auf '+dm(hf.moved_to):''}`:'noch offen'}</div></div>
      <div class="pills">${[['geplant',''],['erledigt','good'],['verschoben','warn']].map(([s,c])=>`<button class="${hf.status===s?'on '+c:''}" onclick="setHF('${s}')">${s}</button>`).join('')}</div></div>
      <div class="ws-extra">
        ${hf.status==='verschoben'?`<label class="ws-sub">Verschoben auf <input class="inp" type="date" value="${esc(hf.moved_to||'')}" onchange="setWeekly('hausfreitag',{moved_to:this.value||null})"></label>`:''}
-       ${tags.length?`<div class="tags">${tags.map(x=>`<span class="tag">${esc(x)}</span>`).join('')}</div>`:''}
-       <input class="inp" placeholder="Stichworte, mit Komma getrennt (max. 5)" value="${esc(hf.note||'')}" onchange="setTags(this.value)">
-     </div></div>`;
-  // Finanz
-  h+=`<div class="ws"><div class="ws-head"><div><div class="ws-title">💶 Finanz-Termin <span class="ws-sub">(Di)</span></div>
-     <div class="ws-sub">${fi.status?`erledigt: ${esc(fi.status)} · ${esc(fi.updated_by||'')}`:'noch offen'}</div></div>
-     <div class="pills">${[['ja','good'],['nein','bad']].map(([s,c])=>`<button class="${fi.status===s?'on '+c:''}" onclick="setFI('${s}')">${s}</button>`).join('')}</div></div>
-     ${fi.status==='nein'?`<div class="ws-extra"><input class="inp" placeholder="Warum nicht? (optional)" value="${esc(fi.note||'')}" onchange="setWeekly('finanz',{note:this.value})"></div>`:''}</div>`;
-  // Intervall (Rasen)
-  for(const t of iv){ const {last,due}=intervalInfo(t); const d=cur(); const doneToday=comp(t.id,d)?.status==='done';
-    const isT=d===today(); const st=doneToday?`${isT?'heute':'am '+dm(d)} erledigt ✓ · nächstes Mal ab ${dm(due)}`:
-      due<=d?`<span class="${due<d?'overdue':'due'}">fällig ${due<d?'seit':'ab'} ${dm(due)}</span>${last?' · zuletzt '+dm(last):''}`:
-      `nächstes Mal ab ${dm(due)}${last?' · zuletzt '+dm(last):''}`;
-    h+=`<div class="ws"><div class="ws-head"><div><div class="ws-title">🌱 ${esc(t.text)}</div><div class="ws-sub">${st}</div></div>
-       <button class="btn small ${doneToday?'':'green'}" onclick="toggleInterval('${sid(t.id)}')">${doneToday?'rückgängig':(isT?'heute erledigt':'am '+dm(d)+' erledigt')}</button></div></div>`; }
-  return h+`</div>`;
+       <input class="inp" placeholder="Plan: Stichworte, mit Komma getrennt (max. 5)" value="${esc(hf.note||'')}" onchange="setTags(this.value)">
+       ${hf.note?`<div class="tags"><span class="ws-sub">Plan:</span>${tagsHtml(hf.note)}</div>`:''}
+     </div>${logArea('hausfreitag',ls)}</div>`;
 }
-function setHF(s){ const wk=monday(cur()); const w=S.weekly.get(`${wk}|hausfreitag`)||{};
-  setWeekly('hausfreitag',{status:w.status===s?null:s, moved_to:s==='verschoben'?(w.moved_to||null):null}); }
-function setFI(s){ const wk=monday(cur()); const w=S.weekly.get(`${wk}|finanz`)||{}; setWeekly('finanz',{status:w.status===s?null:s}); }
+function cardFin(){
+  const fi=wsOf('finanz',monday(cur()));
+  const ls=fi.status==='ja'?'erledigt':fi.status==='nein'?'nicht erledigt':null;
+  return `<div class="ws"><div class="ws-head"><div><div class="ws-title">💶 Finanz-Termin <span class="ws-sub">(Di)</span><!--WHEN--></div>
+     <div class="ws-sub">${ls||'noch offen'}</div></div>
+     <div class="pills">${[['ja','good','erledigt'],['nein','bad','nicht erledigt']].map(([s,c,l])=>`<button class="${fi.status===s?'on '+c:''}" onclick="setFI('${s}')">${l}</button>`).join('')}</div></div>
+     ${logArea('finanz',ls)}</div>`;
+}
+function cardRasen(t){
+  const {last,due}=intervalInfo(t); const d=cur(); const isT=d===today();
+  const done=comp(t.id,d)?.status==='done'; const not=logOf('rasen',d)?.status==='nicht erledigt';
+  const st=done?`${isT?'heute':'am '+dm(d)} erledigt ✓ · nächstes Mal ab ${dm(due)}`:
+    due<=d?`fällig ab ${dm(due)}${last?' · zuletzt '+dm(last):''}`:`nächstes Mal ab ${dm(due)}${last?' · zuletzt '+dm(last):''}`;
+  return `<div class="ws"><div class="ws-head"><div><div class="ws-title">🌱 ${esc(t.text)}<!--WHEN--></div><div class="ws-sub">${st}</div></div>
+     <div class="pills"><button class="${done?'on good':''}" onclick="toggleInterval('${sid(t.id)}')">erledigt</button>
+       <button class="${not?'on bad':''}" onclick="rasenNot('${sid(t.id)}')">${isT?'heute nicht':'nicht'}</button></div></div>
+     ${logArea('rasen',done?'erledigt':not?'nicht erledigt':null)}</div>`;
+}
+const LOG_PH={erledigt:'Was gemacht? Stichworte, mit Komma',verschoben:'Warum verschoben?','nicht erledigt':'Warum nicht?'};
+function logArea(k,status){
+  const d=cur(); const e=logOf(k,d); let h='';
+  if(S.logOpen===k&&status){
+    h+=`<div class="addrow"><input class="inp" id="log-${k}" placeholder="${LOG_PH[status]||'Notiz'}" value="${esc(e?.text||'')}" onkeydown="if(event.key==='Enter')saveLog('${k}','${status}')">
+        <button class="btn primary" onclick="saveLog('${k}','${status}')">Speichern</button><button class="btn" onclick="S.logOpen=null;render()">✕</button></div>`;
+  } else if(e){
+    h+=`<div class="logline">📝 <span class="ws-sub">${esc(e.status||'')}</span> ${tagsHtml(e.text)}
+        ${status?`<button class="lnk" onclick="openLog('${k}')">ändern</button>`:''}<button class="lnk" onclick="delLog('${k}')">löschen</button></div>`;
+  } else if(status){
+    h+=`<div><button class="lnk" onclick="openLog('${k}')">📝 ${status==='erledigt'?'Was gemacht? eintragen':'Begründung eintragen'}</button></div>`;
+  }
+  const hist=logsOf(k).filter(x=>x.date!==d);
+  if(hist.length){
+    const l=hist[0];
+    h+=`<div class="ws-sub">zuletzt ${WD[dow(l.date)]} ${dm(l.date)} · ${esc(l.status||'')}${l.text?': '+esc(l.text):''}
+        <button class="lnk" onclick="S.logExp['${k}']=!S.logExp['${k}'];render()">Logbuch ${S.logExp[k]?'▴':'›'}</button></div>`;
+    if(S.logExp[k]) h+=`<div class="loglist">${hist.slice(0,12).map(logLine).join('')}</div>`;
+  }
+  return h?`<div class="ws-extra">${h}</div>`:'';
+}
+function openLog(k){ S.logOpen=k; render(); setTimeout(()=>document.getElementById('log-'+k)?.focus(),0); }
+async function saveLog(k,status,force){
+  const el=document.getElementById('log-'+k);
+  const text=(force!==undefined?force:(el?el.value:'')).split(',').map(x=>x.trim()).filter(Boolean).join(', ');
+  const d=cur();
+  try{
+    const r1=await db.from('log_entries').delete().eq('key',k).eq('date',d); if(r1.error) throw r1.error;
+    const r=await db.from('log_entries').insert({key:k,date:d,status,text}).select().single(); if(r.error) throw r.error;
+    S.log=S.log.filter(e=>!(e.key===k&&e.date===d)); S.log.push(r.data); S.logOpen=null; render();
+  }catch(e){ fail(e); }
+}
+async function delLog(k){ const d=cur();
+  const r=await db.from('log_entries').delete().eq('key',k).eq('date',d); if(r.error) return fail(r.error);
+  S.log=S.log.filter(e=>!(e.key===k&&e.date===d)); render(); }
+function setHF(s){ const wk=monday(cur()); const w=wsOf('hausfreitag',wk); const nv=w.status===s?null:s;
+  setWeekly('hausfreitag',{status:nv, moved_to:s==='verschoben'?(w.moved_to||null):null});
+  if(nv==='erledigt'||nv==='verschoben') openLog('hausfreitag'); }
+function setFI(s){ const wk=monday(cur()); const w=wsOf('finanz',wk); const nv=w.status===s?null:s;
+  setWeekly('finanz',{status:nv}); if(nv) openLog('finanz'); }
 function setTags(v){ const t=v.split(',').map(s=>s.trim()).filter(Boolean); if(t.length>5) toast('Nur die ersten 5 Stichworte werden gespeichert'); setWeekly('hausfreitag',{note:t.slice(0,5).join(', ')}); }
-function toggleInterval(id){ if(needUser()) return; const d=cur(); setComp(id,d,comp(id,d)?.status==='done'?null:'done'); }
+function toggleInterval(id){ if(needUser()) return; const d=cur(); const on=comp(id,d)?.status==='done';
+  setComp(id,d,on?null:'done');
+  if(!on){ if(logOf('rasen',d)?.status==='nicht erledigt') delLog('rasen'); openLog('rasen'); } }
+async function rasenNot(id){ if(needUser()) return; const d=cur();
+  if(logOf('rasen',d)?.status==='nicht erledigt') return delLog('rasen');
+  if(comp(id,d)?.status==='done') await setComp(id,d,null);
+  await saveLog('rasen','nicht erledigt',''); openLog('rasen'); }
 
 function kidRow(t,child,d){
   const s=kstate(t,d,child);
@@ -581,7 +683,7 @@ function renderWoche(){
     if(S.wkList==='haushalt'){
       const hf=S.weekly.get(`${S.wkStart}|hausfreitag`)||{}; const fi=S.weekly.get(`${S.wkStart}|finanz`)||{};
       h+=`<div class="card wsum"><span><b>Haus-Freitag:</b> ${esc(hf.status||'–')}${hf.status==='verschoben'&&hf.moved_to?' auf '+dm(hf.moved_to):''}${hf.note?' · '+esc(hf.note):''}</span>
-          <span><b>Finanz-Termin:</b> ${esc(fi.status||'–')}${fi.status==='nein'&&fi.note?' · '+esc(fi.note):''}</span></div>`;
+          <span><b>Finanz-Termin:</b> ${fi.status==='ja'?'erledigt':fi.status==='nein'?'nicht erledigt':'–'}</span></div>`;
     }
     const pre=S.wkList==='haushalt'?byList('handycheck'):[];
     const ts=byList(S.wkList);
@@ -590,6 +692,10 @@ function renderWoche(){
     rows+=ts.map(t=>`<tr><td class="name">${esc(t.text)}</td>${days.map(x=>`<td>${cellSimple(t,x)}</td>`).join('')}</tr>`).join('');
     h+=`<div class="legend"><span><i class="c E" style="width:16px;height:16px">E</i>E erledigt</span><span><i class="c B" style="width:16px;height:16px">B</i>B erledigt</span><span>⊘ nicht nötig</span><span>– nicht an diesem Tag</span></div>`;
     h+=`<div class="card tscroll" style="margin-top:8px"><table class="wk">${wkHeader(days)}${rows}</table></div>`;
+    if(S.wkList==='haushalt'){
+      const wl=S.log.filter(e=>e.date>=days[0]&&e.date<=end).sort((a,b)=>a.date.localeCompare(b.date));
+      h+=`<div class="label">Logbuch dieser Woche</div><div class="card" style="padding:6px 14px">${wl.length?wl.map(e=>`<div class="logitem"><b>${WD[dow(e.date)]} ${dm(e.date)}</b> · ${LOGK[e.key]||esc(e.key)} · ${esc(e.status||'')}${e.text?': ':''}${esc(e.text||'')}</div>`).join(''):'<div class="empty">Keine Einträge</div>'}</div>`;
+    }
   }
   return h;
 }
