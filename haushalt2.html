@@ -124,6 +124,10 @@ button{font:inherit;color:inherit}
 .dot-red{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);vertical-align:middle}
 .daynav{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;margin:8px 0 2px;border-radius:10px;background:var(--card)}
 .daynav .t{font-weight:700;font-size:.92rem;text-align:center}
+.mt-item{padding:12px 14px;margin-bottom:8px}
+.mt-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;font-size:.9rem}
+.mt-text{white-space:pre-wrap;font-size:.9rem;line-height:1.45}
+textarea.inp{resize:vertical;font-family:inherit;line-height:1.4}
 .daynav.future{background:#007AFF12;outline:1.5px solid #007AFF55}
 .daynav.future .hint{color:var(--blue)}
 .kid-big.sonder{outline:2px solid #FF950088}
@@ -198,6 +202,7 @@ body.kidmode .content{padding-bottom:calc(70px + var(--safe-b))}
 <nav class="nav" id="nav"><div class="wrap">
   <button data-view="heute"><span class="i">✅</span>Heute</button>
   <button data-view="woche"><span class="i">📅</span>Woche</button>
+  <button data-view="treffen"><span class="i">🗒️</span>Treffen</button>
   <button data-view="einkauf"><span class="i">🛒</span>Einkauf</button>
 </div></nav>
 <div class="toast" id="toast"></div>
@@ -403,6 +408,7 @@ function render(){
   if(!S.loaded){ main.innerHTML=h||'<div class="empty">Lade …</div>'; return; }
   if(S.view==='heute') h+=renderHeute();
   else if(S.view==='woche') h+=renderWoche();
+  else if(S.view==='treffen') h+=renderTreffen();
   else h+=renderEinkauf();
   main.innerHTML=h;
 }
@@ -722,7 +728,7 @@ function renderWoche(){
     h+=`<div class="legend"><span><i class="c E" style="width:16px;height:16px">E</i>E erledigt</span><span><i class="c B" style="width:16px;height:16px">B</i>B erledigt</span><span>⊘ nicht nötig</span><span>– nicht an diesem Tag</span></div>`;
     h+=`<div class="card tscroll" style="margin-top:8px"><table class="wk">${wkHeader(days)}${rows}</table></div>`;
     if(S.wkList==='haushalt'){
-      const wl=S.log.filter(e=>e.date>=days[0]&&e.date<=end).sort((a,b)=>a.date.localeCompare(b.date));
+      const wl=S.log.filter(e=>e.key!=='treffen'&&e.date>=days[0]&&e.date<=end).sort((a,b)=>a.date.localeCompare(b.date));
       h+=`<div class="label">Logbuch dieser Woche</div><div class="card" style="padding:6px 14px">${wl.length?wl.map(e=>`<div class="logitem"><b>${WD[dow(e.date)]} ${dm(e.date)}</b> · ${LOGK[e.key]||esc(e.key)} · ${esc(e.status||'')}${e.text?': ':''}${esc(e.text||'')}</div>`).join(''):'<div class="empty">Keine Einträge</div>'}</div>`;
     }
   }
@@ -730,6 +736,43 @@ function renderWoche(){
 }
 
 // ── Einkauf ──
+// ── Planungstreffen E & B ──
+function renderTreffen(){
+  const list=S.log.filter(e=>e.key==='treffen').sort((a,b)=>b.date.localeCompare(a.date));
+  const q=(S.mtQ||'').toLowerCase();
+  const shown=q?list.filter(e=>(e.text||'').toLowerCase().includes(q)):list;
+  const ed=S.mtEdit?list.find(e=>e.date===S.mtEdit):null;
+  let h=`<div class="label">${ed?'Treffen bearbeiten':'Neues Planungstreffen'}</div>
+    <div class="card" style="padding:12px 14px;display:flex;flex-direction:column;gap:8px">
+      <input class="inp" type="date" id="mtDate" value="${esc(S.mtDate||ed?.date||today())}" onchange="S.mtDate=this.value" ${ed?'disabled':''}>
+      <textarea class="inp" id="mtText" rows="8" placeholder="Ergebnisse hier einfügen …" oninput="S.mtDraft=this.value">${esc(S.mtDraft??ed?.text??'')}</textarea>
+      <div class="addrow"><button class="btn primary" onclick="saveTreffen()">Speichern</button>
+        ${ed||S.mtDraft?'<button class="btn" onclick="cancelTreffen()">Abbrechen</button>':''}</div>
+    </div>`;
+  h+=`<div class="label">Bisherige Treffen (${list.length})</div>`;
+  if(list.length>3) h+=`<input class="inp" placeholder="Suchen …" value="${esc(S.mtQ||'')}" oninput="S.mtQ=this.value;render();const i=document.getElementById('mtSearch');i.focus();i.setSelectionRange(i.value.length,i.value.length)" id="mtSearch" style="margin-bottom:8px">`;
+  h+=shown.length?shown.map(e=>`<div class="card mt-item"><div class="mt-head"><b>${parse(e.date).toLocaleDateString('de-DE',{weekday:'short',day:'numeric',month:'long',year:'numeric'})}</b>
+      <span><button class="lnk" onclick="editTreffen('${e.date}')">bearbeiten</button><button class="lnk" onclick="delTreffen('${e.date}')">löschen</button></span></div>
+      <div class="mt-text">${esc(e.text||'')}</div></div>`).join(''):'<div class="empty">Noch keine Einträge</div>';
+  return h;
+}
+async function saveTreffen(){
+  const date=document.getElementById('mtDate').value; const text=document.getElementById('mtText').value.trim();
+  if(!date) return toast('Bitte ein Datum wählen'); if(!text) return toast('Bitte Ergebnisse einfügen');
+  if(!S.mtEdit&&S.log.some(e=>e.key==='treffen'&&e.date===date)&&!confirm('Für diesen Tag gibt es schon ein Treffen. Ersetzen?')) return;
+  try{
+    const r1=await db.from('log_entries').delete().eq('key','treffen').eq('date',date); if(r1.error) throw r1.error;
+    const r=await db.from('log_entries').insert({key:'treffen',date,status:null,text}).select().single(); if(r.error) throw r.error;
+    S.log=S.log.filter(e=>!(e.key==='treffen'&&e.date===date)); S.log.push(r.data);
+    S.mtDraft=null; S.mtEdit=null; S.mtDate=null; toast('Gespeichert'); render();
+  }catch(e){ fail(e); }
+}
+function editTreffen(d){ S.mtEdit=d; S.mtDraft=null; S.mtDate=null; render(); window.scrollTo(0,0); }
+function cancelTreffen(){ S.mtEdit=null; S.mtDraft=null; S.mtDate=null; render(); }
+async function delTreffen(d){ if(!confirm(`Treffen vom ${dm(d)} löschen?`)) return;
+  const r=await db.from('log_entries').delete().eq('key','treffen').eq('date',d); if(r.error) return fail(r.error);
+  S.log=S.log.filter(e=>!(e.key==='treffen'&&e.date===d)); render(); }
+
 function renderEinkauf(){
   let h='';
   const cats=[...new Set([...CATS,...S.shop.map(x=>x.category||'Sonstiges')])];
@@ -751,6 +794,7 @@ function renderKid(main){
   document.getElementById('person').style.display='none';
   const nav=document.getElementById('nav');
   nav.querySelector('[data-view=woche]').style.display='none';
+  nav.querySelector('[data-view=treffen]').style.display='none';
   nav.querySelectorAll('button').forEach(b=>{ b.classList.toggle('on',b.dataset.view===S.view);
     if(b.dataset.view==='heute') b.innerHTML='<span class="i">✅</span>Aufgaben'; });
   document.getElementById('title').innerHTML=`<span style="color:${KCOL[c]}">${c}</span>`;
