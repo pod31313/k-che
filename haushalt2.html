@@ -167,7 +167,7 @@ table.wk tr.sec td{background:var(--gray-light);font-size:.68rem;font-weight:700
 .empty{padding:14px;color:var(--text-2);font-size:.85rem;text-align:center}
 
 /* Kind-Modus */
-body.kidmode .content{padding-bottom:30px}
+body.kidmode .content{padding-bottom:calc(70px + var(--safe-b))}
 .kid-big .krow{padding:12px 14px;min-height:56px;cursor:pointer;user-select:none}
 .kid-big .krow:active{background:var(--gray-light)}
 .kid-big .kmark{width:28px;height:28px;border-radius:8px;font-size:.95rem;border-width:2px}
@@ -310,7 +310,7 @@ async function load(){
     S.comp=new Map(); for(const c of [...c1,...c2]) S.comp.set(ck(c.task_id,c.date),c);
     S.kid=new Map(); for(const k of [...k1,...k2]) S.kid.set(kk(k.task_id,k.date,k.child_name),k);
     S.weekly=new Map(); for(const w of ws) S.weekly.set(`${w.week_start}|${w.key}`,w);
-    if(!KID) S.shop=await q(db.from('shopping_items').select('*').order('created_at'));
+    S.shop=await q(db.from('shopping_items').select('*').order('created_at'));
     S.err=null; S.loaded=true;
   }catch(e){ console.error(e); S.err=e.message||String(e); }
   render();
@@ -360,7 +360,7 @@ async function toggleShop(id){ const it=S.shop.find(x=>sid(x.id)===id); if(!it) 
   const r=await db.from('shopping_items').update({bought:it.bought}).eq('id',it.id); if(r.error){it.bought=!it.bought;fail(r.error);} }
 async function addShop(){ const text=document.getElementById('shopText').value.trim(); if(!text) return;
   const quantity=document.getElementById('shopQty').value.trim()||'1×'; const category=document.getElementById('shopCat').value;
-  const r=await db.from('shopping_items').insert({text,quantity,category,bought:false,added_by:S.user||'?'}).select().single();
+  const r=await db.from('shopping_items').insert({text,quantity,category,bought:false,added_by:KID||S.user||'?'}).select().single();
   if(r.error) return fail(r.error); S.shop.push(r.data); S._shopCat=category; render(); setTimeout(()=>document.getElementById('shopText')?.focus(),0); }
 async function clearBought(){ const ids=S.shop.filter(x=>x.bought).map(x=>x.id); if(!ids.length) return;
   const r=await db.from('shopping_items').delete().in('id',ids); if(r.error) return fail(r.error); S.shop=S.shop.filter(x=>!x.bought); render(); }
@@ -719,10 +719,14 @@ function renderEinkauf(){
 function renderKid(main){
   const c=KID; const d=today();
   document.body.classList.add('kidmode'); document.body.style.setProperty('--kc',KHEX[c]);
-  document.getElementById('nav').style.display='none';
   document.getElementById('person').style.display='none';
+  const nav=document.getElementById('nav');
+  nav.querySelector('[data-view=woche]').style.display='none';
+  nav.querySelectorAll('button').forEach(b=>{ b.classList.toggle('on',b.dataset.view===S.view);
+    if(b.dataset.view==='heute') b.innerHTML='<span class="i">✅</span>Aufgaben'; });
   document.getElementById('title').innerHTML=`<span style="color:${KCOL[c]}">${c}</span>`;
   if(!S.loaded){ main.innerHTML=S.err?`<div class="err">${esc(S.err)}</div>`:'<div class="empty">Lade …</div>'; return; }
+  if(S.view==='einkauf'){ main.innerHTML=(S.err?`<div class="err">${esc(S.err)}</div>`:'')+renderEinkauf(); return; }
   let all=0,mine=0,h=S.err?`<div class="err">${esc(S.err)}</div>`:'';
   let body='';
   for(const [sec,lab] of SECTIONS){
