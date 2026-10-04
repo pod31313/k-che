@@ -630,8 +630,13 @@ function renderOnce(){
   }
   return h+`</div>`;
 }
-async function addOnce(c){ if(needUser()) return;
+let onceBusy=false;
+async function addOnce(c){ if(needUser()||onceBusy) return;
   const text=document.getElementById('once-text-'+c).value.trim(); if(!text) return toast('Bitte einen Text eingeben');
+  const dup=S.tasks.find(t=>t.kind==='once'&&t.child_name===c&&t.text.toLowerCase()===text.toLowerCase()&&t.next_due_date===document.getElementById('once-date-'+c).value);
+  if(dup) return toast('Diese Sonderaufgabe gibt es für diesen Tag schon');
+  onceBusy=true; try{ await addOnceInner(c,text); } finally { onceBusy=false; } }
+async function addOnceInner(c,text){
   const date=document.getElementById('once-date-'+c).value; const section='morgen';
   if(!date) return toast('Bitte ein Datum wählen');
   if(date<addDays(today(),-MAXBACK)) return toast('Höchstens 7 Tage zurück');
