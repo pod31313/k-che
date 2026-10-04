@@ -114,6 +114,11 @@ button{font:inherit;color:inherit}
 .lg{width:13px;height:13px;border-radius:50%;display:inline-block;border:1.5px solid var(--gray-mid)}
 
 /* Woche */
+.daynav{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;margin:8px 0 2px;border-radius:10px;background:var(--card)}
+.daynav .t{font-weight:700;font-size:.92rem;text-align:center}
+.daynav.past{background:#FF95001f;outline:1.5px solid #FF950066}
+.daynav .hint{font-weight:500;color:var(--orange);font-size:.8rem}
+.btn:disabled{opacity:.35;cursor:default}
 .wk-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0}
 .wk-nav .t{font-weight:700;font-size:.92rem}
 .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -216,11 +221,14 @@ const KID=(()=>{const k=(qs.get('kind')||'').toLowerCase();return KIDS.find(x=>x
 const S={
   user:localStorage.getItem('hh_user')||'',
   view:'heute', list:localStorage.getItem('hh_list')||'haushalt',
+  day:today(), oForm:{kid:null,date:'',section:'nachmittag'},
   wkStart:monday(today()), wkList:'haushalt', wkKid:'Anton',
   mKid:localStorage.getItem('hh_mkid')||'Anton',
   tasks:[], comp:new Map(), kid:new Map(), weekly:new Map(), shop:[],
   err:null, loaded:false
 };
+const cur=()=>KID?today():S.day;
+const MAXBACK=7;
 const sid=x=>String(x);
 const ck=(t,d)=>`${sid(t)}|${d}`;
 const kk=(t,d,c)=>`${sid(t)}|${d}|${c||''}`;
@@ -230,7 +238,7 @@ const kidc=(t,d,c)=>S.kid.get(kk(t,d,c));
 // ═══ Aufgaben-Logik ══════════════════════════════════════════════
 function taskDays(t){ if(Array.isArray(t.days)&&t.days.length) return t.days;
   if(t.day_of_week!==null&&t.day_of_week!==undefined) return [t.day_of_week]; return null; }
-const onDay=(t,d)=>{const x=taskDays(t);return !x||x.includes(dow(d))};
+const onDay=(t,d)=>{ if(t.kind==='once') return t.next_due_date===d; const x=taskDays(t);return !x||x.includes(dow(d))};
 const byList=l=>S.tasks.filter(t=>t.list_name===l).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
 
 // Kinderaufgabe: Kind-Haken k, Eltern-Status p, effektiv erledigt eff
@@ -279,7 +287,7 @@ function intervalInfo(t){
 async function q(p){const r=await p; if(r.error) throw r.error; return r.data||[];}
 async function load(){
   try{
-    const t0=today(); const from=[monday(t0),S.wkStart].sort()[0]; const to=addDays([monday(t0),S.wkStart].sort()[1],6);
+    const t0=today(); const from=[monday(addDays(t0,-MAXBACK)),S.wkStart].sort()[0]; const to=addDays([monday(t0),S.wkStart].sort()[1],6);
     S.tasks=await q(db.from('tasks').select('*').eq('active',true));
     const histIds=S.tasks.filter(t=>t.kind==='rotation'||t.kind==='interval').map(t=>t.id);
     const [c1,k1,c2,k2,ws]=await Promise.all([
@@ -287,7 +295,7 @@ async function load(){
       q(db.from('child_completions').select('*').gte('date',from).lte('date',to)),
       histIds.length?q(db.from('completions').select('*').in('task_id',histIds)):[],
       histIds.length?q(db.from('child_completions').select('*').in('task_id',histIds)):[],
-      KID?[]:q(db.from('weekly_status').select('*').in('week_start',[monday(t0),S.wkStart]))
+      KID?[]:q(db.from('weekly_status').select('*').in('week_start',[monday(t0),monday(addDays(t0,-MAXBACK)),S.wkStart]))
     ]);
     S.comp=new Map(); for(const c of [...c1,...c2]) S.comp.set(ck(c.task_id,c.date),c);
     S.kid=new Map(); for(const k of [...k1,...k2]) S.kid.set(kk(k.task_id,k.date,k.child_name),k);
@@ -315,16 +323,16 @@ async function setComp(taskId,d,status,extra={}){
   }catch(e){ if(prev) S.comp.set(key,prev); else S.comp.delete(key); fail(e); }
 }
 const CYCLE3={null:'done',done:'skip',skip:null,fail:null};
-function cycleTask(id){ if(needUser()) return; const c=comp(id,today()); setComp(id,today(),CYCLE3[c?c.status:null]); }
+function cycleTask(id){ if(needUser()) return; const c=comp(id,cur()); setComp(id,cur(),CYCLE3[c?c.status:null]); }
 function cycleVerify(id,child){ if(needUser()) return;
-  const t=S.tasks.find(x=>sid(x.id)===id); const d=today(); const c=comp(id,d);
+  const t=S.tasks.find(x=>sid(x.id)===id); const d=cur(); const c=comp(id,d);
   const next={null:'done',done:'fail',fail:'skip',skip:null}[c?c.status:null];
   setComp(id,d,next,{child_name:t&&t.kind==='rotation'?child:null}); }
 async function verifyAll(child,section){ if(needUser()) return;
-  const d=today(); const list=kidTasks(child,d,section).filter(t=>kstate(t,d,child).cls==='pending');
+  const d=cur(); const list=kidTasks(child,d,section).filter(t=>kstate(t,d,child).cls==='pending');
   for(const t of list) await setComp(t.id,d,'done',{child_name:t.kind==='rotation'?child:null}); }
 async function toggleKid(id,child){
-  const d=today(); const key=kk(id,d,child); const ex=S.kid.get(key);
+  const d=cur(); const key=kk(id,d,child); const ex=S.kid.get(key);
   try{
     if(ex){ S.kid.delete(key); render(); const r=await db.from('child_completions').delete().eq('task_id',id).eq('date',d).eq('child_name',child); if(r.error) throw r.error; }
     else{ const row={task_id:id,date:d,child_name:child}; S.kid.set(key,row); render();
@@ -332,7 +340,7 @@ async function toggleKid(id,child){
   }catch(e){ if(ex) S.kid.set(key,ex); else S.kid.delete(key); fail(e); }
 }
 async function setWeekly(key,patch){ if(needUser()) return;
-  const wk=monday(today()); const mk=`${wk}|${key}`; const prev=S.weekly.get(mk);
+  const wk=monday(cur()); const mk=`${wk}|${key}`; const prev=S.weekly.get(mk);
   const row={...(prev||{}),week_start:wk,key,...patch,updated_by:S.user,updated_at:new Date().toISOString()}; delete row.id;
   S.weekly.set(mk,row); render();
   try{ const r=await db.from('weekly_status').upsert(row,{onConflict:'week_start,key'}).select().single(); if(r.error) throw r.error; S.weekly.set(mk,r.data); }
@@ -373,7 +381,7 @@ function progress(done,total,color){
   return `<div class="progress"><strong>${done}</strong> von ${total} erledigt</div><div class="pbar"><div style="width:${pct}%;background:${color}"></div></div>`;
 }
 function taskRows(tasks){
-  const d=today();
+  const d=cur();
   if(!tasks.length) return '<div class="empty">Keine Aufgaben</div>';
   return tasks.map(t=>{ const c=comp(t.id,d); const st=c?c.status:'';
     const sym=st==='done'?'✓':st==='skip'?'⊘':'';
@@ -382,7 +390,7 @@ function taskRows(tasks){
 }
 
 function renderHeute(){
-  const d=today(); let h=listSeg(S.list,'setList');
+  const d=cur(); let h=listSeg(S.list,'setList')+dayNav();
   if(S.list==='haushalt'){
     const tasks=byList('haushalt').filter(t=>onDay(t,d));
     const hc=byList('handycheck');
@@ -406,10 +414,10 @@ function renderHeute(){
 }
 
 function renderWochenstatus(){
-  const wk=monday(today());
+  const wk=monday(cur());
   const hf=S.weekly.get(`${wk}|hausfreitag`)||{}; const fi=S.weekly.get(`${wk}|finanz`)||{};
   const iv=byList('intervall');
-  let h=`<div class="label">Diese Woche</div><div class="card">`;
+  let h=`<div class="label">${monday(cur())===monday(today())?'Diese Woche':'Woche ab '+dm(monday(cur()))}</div><div class="card">`;
   // Haus-Freitag
   const tags=(hf.note||'').split(',').map(s=>s.trim()).filter(Boolean);
   h+=`<div class="ws"><div class="ws-head"><div><div class="ws-title">🔧 Haus-Freitag</div>
@@ -426,19 +434,19 @@ function renderWochenstatus(){
      <div class="pills">${[['ja','good'],['nein','bad']].map(([s,c])=>`<button class="${fi.status===s?'on '+c:''}" onclick="setFI('${s}')">${s}</button>`).join('')}</div></div>
      ${fi.status==='nein'?`<div class="ws-extra"><input class="inp" placeholder="Warum nicht? (optional)" value="${esc(fi.note||'')}" onchange="setWeekly('finanz',{note:this.value})"></div>`:''}</div>`;
   // Intervall (Rasen)
-  for(const t of iv){ const {last,due}=intervalInfo(t); const d=today(); const doneToday=comp(t.id,d)?.status==='done';
-    const st=doneToday?`heute erledigt ✓ · nächstes Mal ab ${dm(due)}`:
+  for(const t of iv){ const {last,due}=intervalInfo(t); const d=cur(); const doneToday=comp(t.id,d)?.status==='done';
+    const isT=d===today(); const st=doneToday?`${isT?'heute':'am '+dm(d)} erledigt ✓ · nächstes Mal ab ${dm(due)}`:
       due<=d?`<span class="${due<d?'overdue':'due'}">fällig ${due<d?'seit':'ab'} ${dm(due)}</span>${last?' · zuletzt '+dm(last):''}`:
       `nächstes Mal ab ${dm(due)}${last?' · zuletzt '+dm(last):''}`;
     h+=`<div class="ws"><div class="ws-head"><div><div class="ws-title">🌱 ${esc(t.text)}</div><div class="ws-sub">${st}</div></div>
-       <button class="btn small ${doneToday?'':'green'}" onclick="toggleInterval('${sid(t.id)}')">${doneToday?'rückgängig':'heute erledigt'}</button></div></div>`; }
+       <button class="btn small ${doneToday?'':'green'}" onclick="toggleInterval('${sid(t.id)}')">${doneToday?'rückgängig':(isT?'heute erledigt':'am '+dm(d)+' erledigt')}</button></div></div>`; }
   return h+`</div>`;
 }
-function setHF(s){ const wk=monday(today()); const cur=S.weekly.get(`${wk}|hausfreitag`)||{};
-  setWeekly('hausfreitag',{status:cur.status===s?null:s, moved_to:s==='verschoben'?(cur.moved_to||null):null}); }
-function setFI(s){ const wk=monday(today()); const cur=S.weekly.get(`${wk}|finanz`)||{}; setWeekly('finanz',{status:cur.status===s?null:s}); }
+function setHF(s){ const wk=monday(cur()); const w=S.weekly.get(`${wk}|hausfreitag`)||{};
+  setWeekly('hausfreitag',{status:w.status===s?null:s, moved_to:s==='verschoben'?(w.moved_to||null):null}); }
+function setFI(s){ const wk=monday(cur()); const w=S.weekly.get(`${wk}|finanz`)||{}; setWeekly('finanz',{status:w.status===s?null:s}); }
 function setTags(v){ const t=v.split(',').map(s=>s.trim()).filter(Boolean); if(t.length>5) toast('Nur die ersten 5 Stichworte werden gespeichert'); setWeekly('hausfreitag',{note:t.slice(0,5).join(', ')}); }
-function toggleInterval(id){ if(needUser()) return; const d=today(); setComp(id,d,comp(id,d)?.status==='done'?null:'done'); }
+function toggleInterval(id){ if(needUser()) return; const d=cur(); setComp(id,d,comp(id,d)?.status==='done'?null:'done'); }
 
 function kidRow(t,child,d){
   const s=kstate(t,d,child);
@@ -446,13 +454,14 @@ function kidRow(t,child,d){
   let sub='';
   if(t.kind==='weekly') sub=`<span class="ksub">${weekCount(t,d,child)}/${t.weekly_target||1} diese Woche</span>`;
   else if(t.kind==='rotation') sub=`<span class="ksub">diesmal dran</span>`;
+  else if(t.kind==='once') sub=`<span class="ksub">einmalig</span>`;
   else if(taskDays(t)&&taskDays(t).length<3) sub=`<span class="ksub">${taskDays(t).map(x=>WD[x]).join(', ')}</span>`;
   return `<div class="krow ${s.cls}"><span class="kmark ${s.k?'on':''}" title="vom Kind abgehakt">${s.k?'✓':''}</span>
     <span class="ktxt">${esc(t.text)}${sub}</span>
     <button class="pmark ${s.p||''}" title="Kontrolle E/B" onclick="cycleVerify('${sid(t.id)}','${child}')">${sym}</button></div>`;
 }
 function renderKinderHeute(){
-  const d=today(); let done=0,total=0;
+  const d=cur(); let done=0,total=0;
   for(const c of KIDS) for(const [sec] of SECTIONS) for(const t of kidTasks(c,d,sec)){const s=kstate(t,d,c); if(s.eff!==null){total++; if(s.eff) done++;}}
   let h=progress(done,total,'var(--green)');
   h+=`<div class="legend"><span><i class="lg" style="background:#34C75999;border-color:transparent;border-radius:3px"></i>Kind</span>
@@ -472,8 +481,65 @@ function renderKinderHeute(){
     }
     h+=`</div>`;
   }
+  h+=renderOnce();
   return h;
 }
+
+// ── Einzelaufgaben ──
+function renderOnce(){
+  const from=addDays(today(),-MAXBACK);
+  let h=`<div class="label">Einmalige Aufgaben</div><div class="kgrid">`;
+  for(const c of KIDS){
+    const list=byList('kinder2').filter(t=>t.kind==='once'&&t.child_name===c&&t.next_due_date>=from)
+      .sort((a,b)=>a.next_due_date.localeCompare(b.next_due_date));
+    const def=S.oForm.kid===c&&S.oForm.date?S.oForm.date:cur();
+    h+=`<div class="kcol ${S.mKid===c?'sel':''}"><div class="khead" style="border-color:${KCOL[c]}"><span class="kname" style="color:${KCOL[c]}">${c}</span></div>`+
+      list.map(t=>{ const s=kstate(t,t.next_due_date,c);
+        const st=s.p==='done'?' ✓':s.p==='fail'?' ✗':s.k?' (Kind ✓)':'';
+        const past=t.next_due_date<today();
+        return `<div class="krow"><span class="ktxt"><span class="ksub" style="color:${past?'var(--text-2)':'var(--orange)'}">${WD[dow(t.next_due_date)]} ${dm(t.next_due_date)} · ${SECTIONS.find(x=>x[0]===t.section)?.[1]||''}${st}</span>${esc(t.text)}</span>
+          <button class="btn small" title="löschen" onclick="delOnce('${sid(t.id)}')">✕</button></div>`;}).join('')+
+      `<div class="ws-extra" style="padding:8px 10px 10px;margin:0">
+         <input class="inp" id="once-text-${c}" placeholder="Neue Aufgabe für ${c} …" onkeydown="if(event.key==='Enter')addOnce('${c}')">
+         <div class="addrow"><input class="inp" type="date" id="once-date-${c}" value="${def}" min="${from}">
+         <select class="inp" id="once-sec-${c}">${SECTIONS.map(([k,l])=>`<option value="${k}" ${k===(S.oForm.kid===c?S.oForm.section:'nachmittag')?'selected':''}>${l}</option>`).join('')}</select>
+         <button class="btn primary" onclick="addOnce('${c}')">+</button></div></div></div>`;
+  }
+  return h+`</div>`;
+}
+async function addOnce(c){ if(needUser()) return;
+  const text=document.getElementById('once-text-'+c).value.trim(); if(!text) return toast('Bitte einen Text eingeben');
+  const date=document.getElementById('once-date-'+c).value; const section=document.getElementById('once-sec-'+c).value;
+  if(!date) return toast('Bitte ein Datum wählen');
+  if(date<addDays(today(),-MAXBACK)) return toast('Höchstens 7 Tage zurück');
+  const row={text,list_name:'kinder2',child_name:c,section,kind:'once',next_due_date:date,sort_order:100,active:true};
+  const r=await db.from('tasks').insert(row).select().single(); if(r.error) return fail(r.error);
+  S.tasks.push(r.data); S.oForm={kid:c,date,section};
+  toast(`„${text}" für ${c} am ${WD[dow(date)]} ${dm(date)} eingetragen`); render();
+  setTimeout(()=>document.getElementById('once-text-'+c)?.focus(),0);
+}
+async function delOnce(id){ if(needUser()) return;
+  const t=S.tasks.find(x=>sid(x.id)===id); if(!t) return;
+  if(!confirm(`„${t.text}" (${dm(t.next_due_date)}) löschen?`)) return;
+  let r=await db.from('tasks').update({active:false}).eq('id',t.id);
+  if(r.error) r=await db.from('tasks').delete().eq('id',t.id);
+  if(r.error) return fail(r.error);
+  S.tasks=S.tasks.filter(x=>x!==t); render();
+}
+
+// ── Tag wählen (Eltern) ──
+function dayNav(){
+  const d=cur(), t=today(), min=addDays(t,-MAXBACK);
+  const lab=d===t?'Heute':d===addDays(t,-1)?'Gestern':'';
+  const full=parse(d).toLocaleDateString('de-DE',{weekday:'short',day:'numeric',month:'numeric'});
+  return `<div class="daynav ${d===t?'':'past'}">
+    <button class="btn" onclick="moveDay(-1)" ${d<=min?'disabled':''}>←</button>
+    <span class="t">${lab?lab+' · ':''}${full}${d===t?'':' <span class="hint">– nachträglich bearbeiten</span>'}</span>
+    <span>${d===t?'':'<button class="btn" onclick="moveDay(0)">Heute</button> '}<button class="btn" onclick="moveDay(1)" ${d>=t?'disabled':''}>→</button></span></div>`;
+}
+function moveDay(n){ const t=today(); let d=n?addDays(S.day,n):t;
+  if(d>t) d=t; if(d<addDays(t,-MAXBACK)) d=addDays(t,-MAXBACK);
+  S.day=d; render(); window.scrollTo(0,0); }
 
 // ── Woche ──
 function weekDays(){ return Array.from({length:7},(_,i)=>addDays(S.wkStart,i)); }
@@ -505,10 +571,10 @@ function renderWoche(){
     h+=`<div class="legend"><span><i class="c kid" style="width:16px;height:16px">K</i>nur Kind</span><span><i class="c ok" style="width:16px;height:16px">✓</i>kontrolliert</span><span><i class="c fail" style="width:16px;height:16px">✗</i>nicht erledigt</span><span>⊘ nicht nötig</span></div>`;
     let rows='';
     for(const [sec,lab] of SECTIONS){
-      const ts=byList('kinder2').filter(t=>t.section===sec&&(t.kind==='rotation'?(t.rotation||[]).includes(S.wkKid):t.child_name===S.wkKid));
+      const ts=byList('kinder2').filter(t=>t.section===sec&&(t.kind==='rotation'?(t.rotation||[]).includes(S.wkKid):t.child_name===S.wkKid)&&(t.kind!=='once'||(t.next_due_date>=days[0]&&t.next_due_date<=end)));
       if(!ts.length) continue;
       rows+=`<tr class="sec"><td colspan="8">${lab}</td></tr>`;
-      rows+=ts.map(t=>`<tr><td class="name">${esc(t.text)}${t.kind==='weekly'?` <span class="ksub" style="display:inline">${weekCount(t,end<today()?end:today(),S.wkKid)}/${t.weekly_target}</span>`:''}</td>${days.map(x=>`<td>${cellKid(t,x,S.wkKid)}</td>`).join('')}</tr>`).join('');
+      rows+=ts.map(t=>`<tr><td class="name">${esc(t.text)}${t.kind==='once'?` <span class="ksub" style="display:inline">einmalig</span>`:''}${t.kind==='weekly'?` <span class="ksub" style="display:inline">${weekCount(t,end<today()?end:today(),S.wkKid)}/${t.weekly_target}</span>`:''}</td>${days.map(x=>`<td>${cellKid(t,x,S.wkKid)}</td>`).join('')}</tr>`).join('');
     }
     h+=`<div class="card tscroll" style="margin-top:8px"><table class="wk">${wkHeader(days)}${rows}</table></div>`;
   } else {
@@ -558,7 +624,7 @@ function renderKid(main){
     body+=`<div class="label">${lab}</div><div class="card kid-big">`+ts.map(t=>{
       const s=kstate(t,d,c); all++; if(s.k) mine++;
       const vb=s.p==='done'?'<span class="vbadge done">✓ kontrolliert</span>':s.p==='fail'?'<span class="vbadge fail">nochmal!</span>':s.p==='skip'?'<span class="vbadge skip">nicht nötig</span>':'';
-      const sub=t.kind==='weekly'?`<span class="ksub">${weekCount(t,d,c)}/${t.weekly_target} diese Woche</span>`:t.kind==='rotation'?'<span class="ksub">du bist dran</span>':'';
+      const sub=t.kind==='weekly'?`<span class="ksub">${weekCount(t,d,c)}/${t.weekly_target} diese Woche</span>`:t.kind==='rotation'?'<span class="ksub">du bist dran</span>':t.kind==='once'?'<span class="ksub">nur heute</span>':'';
       return `<div class="krow ${s.k?'mine':''}" onclick="toggleKid('${sid(t.id)}','${c}')"><span class="kmark ${s.k?'on':''}">${s.k?'✓':''}</span><span class="ktxt">${esc(t.text)}${sub}</span>${vb}</div>`;
     }).join('')+`</div>`;
   }
@@ -578,7 +644,7 @@ document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>{ S.view=b.dat
 // Aktualisieren: alle 30 s und beim Zurückkehren in die App; Tageswechsel erkennen
 let lastDay=today();
 function refresh(){ if(document.activeElement&&['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)) return;
-  if(today()!==lastDay){ lastDay=today(); S.wkStart=monday(today()); } load(); }
+  if(today()!==lastDay){ lastDay=today(); S.wkStart=monday(today()); S.day=today(); } load(); }
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden) refresh(); });
 if(!window.__MOCK_DB__) setInterval(()=>{ if(!document.hidden) refresh(); },30000);
 load();
