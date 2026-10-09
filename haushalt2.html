@@ -515,9 +515,10 @@ function cardHaus(){
 }
 function cardFin(){
   const fi=wsOf('finanz',monday(cur()));
-  const ls=fi.status==='ja'?'erledigt':fi.status==='nein'?'nicht erledigt':null;
+  const st=fi.status==='ja'?'erledigt':fi.status==='nein'?'nicht erledigt':null;
+  const ls=st||'Notiz';   // Eintrag im Logbuch ist immer möglich – auch bei offen/erledigt
   return `<div class="ws"><div class="ws-head"><div><div class="ws-title">💶 Finanz-Termin <span class="ws-sub">(Di)</span><!--WHEN--></div>
-     <div class="ws-sub">${ls||'noch offen'}</div></div>
+     <div class="ws-sub">${st||'noch offen'}</div></div>
      <div class="pills">${[['ja','good','erledigt'],['nein','bad','nicht erledigt']].map(([s,c,l])=>`<button class="${fi.status===s?'on '+c:''}" onclick="setFI('${s}')">${l}</button>`).join('')}</div></div>
      ${logArea('finanz',ls)}</div>`;
 }
@@ -531,7 +532,7 @@ function cardRasen(t){
        <button class="${not?'on bad':''}" onclick="rasenNot('${sid(t.id)}')">${isT?'heute nicht':'nicht'}</button></div></div>
      ${logArea('rasen',done?'erledigt':not?'nicht erledigt':null)}</div>`;
 }
-const LOG_PH={erledigt:'Was gemacht? Stichworte, mit Komma',verschoben:'Warum verschoben?','nicht erledigt':'Warum nicht?'};
+const LOG_PH={Notiz:'Notiz, Stichworte mit Komma',erledigt:'Was gemacht? Stichworte, mit Komma',verschoben:'Warum verschoben?','nicht erledigt':'Warum nicht?'};
 function logArea(k,status){
   const d=cur(); const e=logOf(k,d); let h='';
   if(S.logOpen===k&&status){
@@ -541,7 +542,7 @@ function logArea(k,status){
     h+=`<div class="logline">📝 <span class="ws-sub">${esc(e.status||'')}</span> ${tagsHtml(e.text)}
         ${status?`<button class="lnk" onclick="openLog('${k}')">ändern</button>`:''}<button class="lnk" onclick="delLog('${k}')">löschen</button></div>`;
   } else if(status){
-    h+=`<div><button class="lnk" onclick="openLog('${k}')">📝 ${status==='erledigt'?'Was gemacht? eintragen':'Begründung eintragen'}</button></div>`;
+    h+=`<div><button class="lnk" onclick="openLog('${k}')">📝 ${status==='erledigt'?'Was gemacht? eintragen':status==='Notiz'?'Notiz eintragen':'Begründung eintragen'}</button></div>`;
   }
   const hist=logsOf(k).filter(x=>x.date!==d);
   if(hist.length){
