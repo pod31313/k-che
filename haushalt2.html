@@ -119,6 +119,18 @@ button{font:inherit;color:inherit}
 .loglist{margin-top:4px}
 .logitem{font-size:.82rem;padding:6px 0;border-top:1px solid var(--border)}
 .logitem:first-child{border-top:none}
+.mt-text.md{white-space:normal}
+.md p{margin:.35em 0}.md .mdh{margin:.7em 0 .25em;font-size:1rem}.md h2.mdh{font-size:1.1rem}
+.md hr{border:none;border-top:1px solid var(--border);margin:.6em 0}
+.md blockquote{margin:.4em 0;padding:.1em .7em;border-left:3px solid var(--border);opacity:.85}
+.md pre{overflow-x:auto;padding:8px;border-radius:8px;background:rgba(120,120,120,.12);font-size:.82rem}
+.md code{background:rgba(120,120,120,.15);padding:0 4px;border-radius:4px;font-size:.88em}
+.md a{color:var(--blue,#0a84ff);word-break:break-all}
+.mdl{list-style:none;margin:.3em 0;padding:0}
+.mdl li{display:flex;gap:8px;align-items:flex-start;padding:3px 0}
+.mdl li .bm{min-width:1.1em;opacity:.7}
+.mdl li.task input{width:20px;height:20px;margin:1px 0 0;flex:none}
+.mdl li.task.done span{text-decoration:line-through;opacity:.55}
 .logitem.sel{background:var(--soft,rgba(120,120,120,.08));border-radius:6px;padding-left:6px}
 .loghead{display:flex;justify-content:space-between;align-items:center;margin-top:4px}
 .ws.due-hl{background:#FF95000f;box-shadow:inset 4px 0 0 var(--orange)}
@@ -758,6 +770,57 @@ function renderWoche(){
 
 // ── Einkauf ──
 // ── Planungstreffen E & B ──
+// ── Mini-Markdown (sicher: erst escapen, dann formatieren) ──
+function mdInline(t){
+  const codes=[]; t=esc(t).replace(/`([^`]+)`/g,(_,c)=>{codes.push(c);return '\u0000'+(codes.length-1)+'\u0000';});
+  t=t.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>')
+     .replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g,'$1<a href="$2" target="_blank" rel="noopener">$2</a>')
+     .replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/__([^_]+)__/g,'<b>$1</b>')
+     .replace(/(^|[^*\w])\*([^*\s][^*]*)\*(?!\*)/g,'$1<i>$2</i>').replace(/(^|[^_\w])_([^_\s][^_]*)_(?![_\w])/g,'$1<i>$2</i>')
+     .replace(/~~([^~]+)~~/g,'<s>$1</s>');
+  return t.replace(/\u0000(\d+)\u0000/g,(_,i)=>`<code>${codes[i]}</code>`);
+}
+function mdRender(text,date){
+  const L=String(text||'').replace(/\r/g,'').split('\n'); const out=[]; let i=0;
+  const listRe=/^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
+  while(i<L.length){
+    const ln=L[i];
+    if(/^```/.test(ln)){ const buf=[]; i++; while(i<L.length&&!/^```/.test(L[i])) buf.push(L[i++]); i++; out.push(`<pre>${esc(buf.join('\n'))}</pre>`); continue; }
+    if(!ln.trim()){ i++; continue; }
+    let m;
+    if((m=ln.match(/^(#{1,4})\s+(.*)$/))){ out.push(`<h${m[1].length+1} class="mdh">${mdInline(m[2])}</h${m[1].length+1}>`); i++; continue; }
+    if(/^\s*([-*_])\1{2,}\s*$/.test(ln)){ out.push('<hr>'); i++; continue; }
+    if(/^>\s?/.test(ln)){ const buf=[]; while(i<L.length&&/^>\s?/.test(L[i])) buf.push(mdInline(L[i++].replace(/^>\s?/,''))); out.push(`<blockquote>${buf.join('<br>')}</blockquote>`); continue; }
+    if(listRe.test(ln)){
+      const items=[];
+      while(i<L.length&&listRe.test(L[i])){
+        const mm=L[i].match(listRe); const lvl=Math.min(3,Math.floor(mm[1].replace(/\t/g,'  ').length/2));
+        const tk=mm[3].match(/^\[( |x|X)\]\s+(.*)$/);
+        const body=tk?tk[2]:mm[3];
+        if(tk){ const on=tk[1]!==' ';
+          items.push(`<li class="task${on?' done':''}" style="margin-left:${lvl*18}px"><input type="checkbox"${on?' checked':''} onchange="toggleChk('${date}',${i})"><span>${mdInline(body)}</span></li>`); }
+        else items.push(`<li class="bul" style="margin-left:${lvl*18}px"><span class="bm">${/^\d/.test(mm[2])?esc(mm[2]):'•'}</span><span>${mdInline(body)}</span></li>`);
+        i++;
+      }
+      out.push(`<ul class="mdl">${items.join('')}</ul>`); continue;
+    }
+    const buf=[]; while(i<L.length&&L[i].trim()&&!/^(#{1,4}\s|```|>\s?|\s*([-*+]|\d+[.)])\s+)/.test(L[i])&&!/^\s*([-*_])\1{2,}\s*$/.test(L[i])) buf.push(mdInline(L[i++]));
+    out.push(`<p>${buf.join('<br>')}</p>`);
+  }
+  return out.join('');
+}
+async function toggleChk(date,idx){
+  if(needUser()){ render(); return; }
+  const e=S.log.find(x=>x.key==='treffen'&&x.date===date); if(!e) return;
+  const L=(e.text||'').split('\n'); const m=(L[idx]||'').match(/^(\s*(?:[-*+]|\d+[.)])\s+)\[( |x|X)\](.*)$/); if(!m) return;
+  L[idx]=m[1]+(m[2]===' '?'[x]':'[ ]')+m[3];
+  const text=L.join('\n');
+  try{
+    const r1=await db.from('log_entries').delete().eq('key','treffen').eq('date',date); if(r1.error) throw r1.error;
+    const r=await db.from('log_entries').insert({key:'treffen',date,status:null,text}).select().single(); if(r.error) throw r.error;
+    S.log=S.log.filter(x=>!(x.key==='treffen'&&x.date===date)); S.log.push(r.data); render();
+  }catch(err){ fail(err); render(); }
+}
 function renderTreffen(){
   const list=S.log.filter(e=>e.key==='treffen').sort((a,b)=>b.date.localeCompare(a.date));
   const q=(S.mtQ||'').toLowerCase();
@@ -774,7 +837,7 @@ function renderTreffen(){
   if(list.length>3) h+=`<input class="inp" placeholder="Suchen …" value="${esc(S.mtQ||'')}" oninput="S.mtQ=this.value;render();const i=document.getElementById('mtSearch');i.focus();i.setSelectionRange(i.value.length,i.value.length)" id="mtSearch" style="margin-bottom:8px">`;
   h+=shown.length?shown.map(e=>`<div class="card mt-item"><div class="mt-head"><b>${parse(e.date).toLocaleDateString('de-DE',{weekday:'short',day:'numeric',month:'long',year:'numeric'})}</b>
       <span><button class="lnk" onclick="editTreffen('${e.date}')">bearbeiten</button><button class="lnk" onclick="delTreffen('${e.date}')">löschen</button></span></div>
-      <div class="mt-text">${esc(e.text||'')}</div></div>`).join(''):'<div class="empty">Noch keine Einträge</div>';
+      <div class="mt-text md">${mdRender(e.text,e.date)}</div></div>`).join(''):'<div class="empty">Noch keine Einträge</div>';
   return h;
 }
 async function saveTreffen(){
