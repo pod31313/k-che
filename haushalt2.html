@@ -414,7 +414,7 @@ function render(){
 }
 function listSeg(cur,fn){
   return `<div class="seg listseg">${[['haushalt','🏠 Haushalt'],['kinder','🧒 Kinder'],['abend','🌙 Abend']].map(([k,l])=>
-    `<button class="${k} ${cur===k?'on':''}" onclick="${fn}('${k}')">${l}${k==='haushalt'&&cur!=='haushalt'&&S.user==='B'&&S.view==='heute'&&dueItems().length?' <span class="dot-red"></span>':''}</button>`).join('')}</div>`;
+    `<button class="${k} ${cur===k?'on':''}" onclick="${fn}('${k}')">${l}${k==='haushalt'&&cur!=='haushalt'&&S.view==='heute'&&dueItems().length?' <span class="dot-red"></span>':''}</button>`).join('')}</div>`;
 }
 function progress(done,total,color){
   const pct=total?Math.round(done/total*100):0;
@@ -437,7 +437,7 @@ function renderHeute(){
     const all=[...hc,...tasks]; const done=all.filter(t=>comp(t.id,d)?.status==='done').length;
     const rel=all.filter(t=>comp(t.id,d)?.status!=='skip').length;
     h+=progress(done,rel,'var(--blue)');
-    const due=(S.user==='B'&&d===today())?dueItems():[];
+    const due=(d===today())?dueItems():[];
     if(due.length) h+=renderDue(due);
     if(hc.length){
       h+=`<div class="label">Morgens</div><div class="card hc"><div class="hc-q">📵 Handys über Nacht draußen?</div><div class="chips">`+
@@ -456,7 +456,7 @@ function renderHeute(){
 }
 
 // ═══ Wochenstatus & Logbuch ══════════════════════════════════════
-const LOGK={hausfreitag:'🔧 Haus-Freitag',finanz:'💶 Finanz-Termin',rasen:'🌱 Rasenmähen'};
+const LOGK={hausfreitag:'🔧 Haus-Freitag',finanz:'💶 Finanz-Termin',wochenplan:'🗓 Wochen-Planung E&B',rasen:'🌱 Rasenmähen'};
 const logOf=(k,d)=>S.log.find(e=>e.key===k&&e.date===d);
 const logsOf=k=>S.log.filter(e=>e.key===k).sort((a,b)=>b.date.localeCompare(a.date));
 const wsOf=(k,wk)=>S.weekly.get(`${wk}|${k}`)||{};
@@ -470,23 +470,25 @@ function dueItems(){
   for(const wk of [monday(addDays(t,-7)),monday(t)]){
     const fi=wsOf('finanz',wk), fd=wkDay(wk,1);
     if(!fi.status&&fd<=t&&fd>=min) out.push({key:'finanz',date:fd,wk});
+    const wp=wsOf('wochenplan',wk), wd=wkDay(wk,5);
+    if(!wp.status&&wd<=t&&wd>=min) out.push({key:'wochenplan',date:wd,wk});
     const hf=wsOf('hausfreitag',wk); let hd=wkDay(wk,4); let open=hf.status!=='erledigt';
     if(hf.status==='verschoben'){ if(hf.moved_to) hd=hf.moved_to; else open=false; }
     if(open&&hd<=t&&hd>=min) out.push({key:'hausfreitag',date:hd,wk});
   }
   for(const r of byList('intervall')){ const {due}=intervalInfo(r);
     if(due<=t&&comp(r.id,t)?.status!=='done'&&!logOf('rasen',t)) out.push({key:'rasen',date:due,wk:monday(t),task:r}); }
-  return out;
+  return S.user==='B'?out:out.filter(x=>x.key==='wochenplan');   // E sieht nur die Wochen-Planung
 }
 function renderDue(items){
   const t=today(); let h=`<div class="label" style="color:var(--orange)">⏰ Fällig</div><div class="card">`;
   for(const it of items){
     const late=it.date<t; const when=late?`offen seit ${WD[dow(it.date)]} ${dm(it.date)}`:'heute fällig';
     if(it.wk===monday(t)){
-      const body=it.key==='finanz'?cardFin():it.key==='hausfreitag'?cardHaus():cardRasen(it.task);
+      const body=it.key==='finanz'?cardFin():it.key==='wochenplan'?cardWP():it.key==='hausfreitag'?cardHaus():cardRasen(it.task);
       h+=body.replace('class="ws"',`class="ws ${late?'late-hl':'due-hl'}"`).replace('<!--WHEN-->',`<span class="${late?'overdue':'due'}"> · ${when}</span>`);
     } else {
-      const jump=it.key==='finanz'?wkDay(it.wk,1):wkDay(it.wk,4);
+      const jump=it.key==='finanz'?wkDay(it.wk,1):it.key==='wochenplan'?wkDay(it.wk,5):wkDay(it.wk,4);
       h+=`<div class="ws late-hl"><div class="ws-head"><div><div class="ws-title">${LOGK[it.key]}</div><div class="ws-sub overdue">${when} (Vorwoche)</div></div>
           <button class="btn small" onclick="S.day='${jump}';render();window.scrollTo(0,0)">eintragen →</button></div></div>`;
     }
@@ -497,6 +499,7 @@ function renderWochenstatus(skip=[]){
   const parts=[];
   if(!skip.includes('hausfreitag')) parts.push(cardHaus());
   if(!skip.includes('finanz')) parts.push(cardFin());
+  if(!skip.includes('wochenplan')) parts.push(cardWP());
   if(!skip.includes('rasen')) for(const t of byList('intervall')) parts.push(cardRasen(t));
   if(!parts.length) return '';
   return `<div class="label">${monday(cur())===monday(today())?'Diese Woche':'Woche ab '+dm(monday(cur()))}</div><div class="card">${parts.join('')}</div>`;
@@ -522,6 +525,15 @@ function cardFin(){
      <div class="pills">${[['ja','good','erledigt'],['nein','bad','nicht erledigt']].map(([s,c,l])=>`<button class="${fi.status===s?'on '+c:''}" onclick="setFI('${s}')">${l}</button>`).join('')}</div></div>
      ${logArea('finanz',ls)}</div>`;
 }
+function cardWP(){
+  const w=wsOf('wochenplan',monday(cur()));
+  const st=w.status==='ja'?'erledigt':w.status==='nein'?'nicht erledigt':null;
+  const ls=st||'Notiz';
+  return `<div class="ws"><div class="ws-head"><div><div class="ws-title">🗓 Wochen-Planung E&amp;B <span class="ws-sub">(Sa)</span><!--WHEN--></div>
+     <div class="ws-sub">${st||'noch offen'}</div></div>
+     <div class="pills">${[['ja','good','erledigt'],['nein','bad','nicht erledigt']].map(([s,c,l])=>`<button class="${w.status===s?'on '+c:''}" onclick="setWP('${s}')">${l}</button>`).join('')}</div></div>
+     ${logArea('wochenplan',ls)}</div>`;
+}
 function cardRasen(t){
   const {last,due}=intervalInfo(t); const d=cur(); const isT=d===today();
   const done=comp(t.id,d)?.status==='done'; const not=logOf('rasen',d)?.status==='nicht erledigt';
@@ -537,7 +549,7 @@ function logArea(k,status){
   const d=cur(); const e=logOf(k,d); let h='';
   if(S.logOpen===k&&(status||e)){
     const cur0=e?.status||status;
-    if(k==='finanz') h+=`<div class="addrow"><select class="inp" id="logst-${k}">${['erledigt','nicht erledigt','Notiz'].map(o=>`<option${o===cur0?' selected':''}>${o}</option>`).join('')}</select></div>`;
+    if(k==='finanz'||k==='wochenplan') h+=`<div class="addrow"><select class="inp" id="logst-${k}">${['erledigt','nicht erledigt','Notiz'].map(o=>`<option${o===cur0?' selected':''}>${o}</option>`).join('')}</select></div>`;
     h+=`<div class="addrow"><input class="inp" id="log-${k}" placeholder="${LOG_PH[cur0]||'Notiz'}" value="${esc(e?.text||'')}" onkeydown="if(event.key==='Enter')saveLog('${k}','${status}')">
         <button class="btn primary" onclick="saveLog('${k}','${status}')">Speichern</button><button class="btn" onclick="S.logOpen=null;render()">✕</button></div>`;
   } else if(e){
@@ -575,6 +587,8 @@ function setHF(s){ const wk=monday(cur()); const w=wsOf('hausfreitag',wk); const
   if(nv==='erledigt'||nv==='verschoben') openLog('hausfreitag'); }
 function setFI(s){ const wk=monday(cur()); const w=wsOf('finanz',wk); const nv=w.status===s?null:s;
   setWeekly('finanz',{status:nv}); if(nv) openLog('finanz'); }
+function setWP(s){ const wk=monday(cur()); const w=wsOf('wochenplan',wk); const nv=w.status===s?null:s;
+  setWeekly('wochenplan',{status:nv}); if(nv) openLog('wochenplan'); }
 function setTags(v){ const t=v.split(',').map(s=>s.trim()).filter(Boolean); if(t.length>5) toast('Nur die ersten 5 Stichworte werden gespeichert'); setWeekly('hausfreitag',{note:t.slice(0,5).join(', ')}); }
 function toggleInterval(id){ if(needUser()) return; const d=cur(); const on=comp(id,d)?.status==='done';
   setComp(id,d,on?null:'done');
@@ -720,9 +734,10 @@ function renderWoche(){
     h+=`<div class="card tscroll" style="margin-top:8px"><table class="wk">${wkHeader(days)}${rows}</table></div>`;
   } else {
     if(S.wkList==='haushalt'){
-      const hf=S.weekly.get(`${S.wkStart}|hausfreitag`)||{}; const fi=S.weekly.get(`${S.wkStart}|finanz`)||{};
+      const hf=S.weekly.get(`${S.wkStart}|hausfreitag`)||{}; const fi=S.weekly.get(`${S.wkStart}|finanz`)||{}; const wpw=S.weekly.get(`${S.wkStart}|wochenplan`)||{};
       h+=`<div class="card wsum"><span><b>Haus-Freitag:</b> ${esc(hf.status||'–')}${hf.status==='verschoben'&&hf.moved_to?' auf '+dm(hf.moved_to):''}${hf.note?' · '+esc(hf.note):''}</span>
-          <span><b>Finanz-Termin:</b> ${fi.status==='ja'?'erledigt':fi.status==='nein'?'nicht erledigt':'–'}</span></div>`;
+          <span><b>Finanz-Termin:</b> ${fi.status==='ja'?'erledigt':fi.status==='nein'?'nicht erledigt':'–'}</span>
+          <span><b>Wochen-Planung:</b> ${wpw.status==='ja'?'erledigt':wpw.status==='nein'?'nicht erledigt':'–'}</span></div>`;
     }
     const pre=S.wkList==='haushalt'?byList('handycheck'):[];
     const ts=byList(S.wkList);
