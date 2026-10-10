@@ -510,7 +510,7 @@ function renderWochenstatus(skip=[]){
 }
 function cardHaus(){
   const hf=wsOf('hausfreitag',monday(cur()));
-  const ls=hf.status==='erledigt'?'erledigt':hf.status==='verschoben'?'verschoben':null;
+  const ls=hf.status==='erledigt'?'erledigt':hf.status==='verschoben'?'verschoben':'Notiz';
   return `<div class="ws"><div class="ws-head"><div><div class="ws-title">🔧 Haus-Freitag<!--WHEN--></div>
      <div class="ws-sub">${hf.status?`${esc(hf.status)}${hf.status==='verschoben'&&hf.moved_to?' auf '+dm(hf.moved_to):''}`:'noch offen'}</div></div>
      <div class="pills">${[['geplant',''],['erledigt','good'],['verschoben','warn']].map(([s,c])=>`<button class="${hf.status===s?'on '+c:''}" onclick="setHF('${s}')">${s}</button>`).join('')}</div></div>
@@ -553,7 +553,8 @@ function logArea(k,status){
   const d=cur(); const e=logOf(k,d); let h='';
   if(S.logOpen===k&&(status||e)){
     const cur0=e?.status||status;
-    if(k==='finanz'||k==='wochenplan') h+=`<div class="addrow"><select class="inp" id="logst-${k}">${['erledigt','nicht erledigt','Notiz'].map(o=>`<option${o===cur0?' selected':''}>${o}</option>`).join('')}</select></div>`;
+    const opts=k==='hausfreitag'?['erledigt','verschoben','nicht erledigt','Notiz']:['erledigt','nicht erledigt','Notiz'];
+    if(k==='finanz'||k==='wochenplan'||k==='hausfreitag') h+=`<div class="addrow"><select class="inp" id="logst-${k}">${opts.map(o=>`<option${o===cur0?' selected':''}>${o}</option>`).join('')}</select></div>`;
     h+=`<div class="addrow"><input class="inp" id="log-${k}" placeholder="${LOG_PH[cur0]||'Notiz'}" value="${esc(e?.text||'')}" onkeydown="if(event.key==='Enter')saveLog('${k}','${status}')">
         <button class="btn primary" onclick="saveLog('${k}','${status}')">Speichern</button><button class="btn" onclick="S.logOpen=null;render()">✕</button></div>`;
   } else if(status&&!e){
