@@ -462,7 +462,7 @@ const logsOf=k=>S.log.filter(e=>e.key===k).sort((a,b)=>b.date.localeCompare(a.da
 const wsOf=(k,wk)=>S.weekly.get(`${wk}|${k}`)||{};
 const wkDay=(d,n)=>addDays(monday(d),n);   // 0=Mo … 6=So
 const tagsHtml=t=>(t||'').split(',').map(x=>x.trim()).filter(Boolean).map(x=>`<span class="tag">${esc(x)}</span>`).join('');
-const logLine=e=>`<div class="logitem"><b>${WD[dow(e.date)]} ${dm(e.date)}</b> · ${esc(e.status||'')}${e.text?': ':''}${esc(e.text||'')}</div>`;
+const logLine=e=>`<div class="logitem"><b>${WD[dow(e.date)]} ${dm(e.date)}</b> · ${esc(e.status||'')}${e.text?': ':''}${esc(e.text||'')} <button class="lnk" onclick="S.day='${e.date}';S.logOpen='${e.key}';render();setTimeout(()=>document.getElementById('log-${e.key}')?.focus(),0)">ändern</button></div>`;
 
 // Erinnerungen: nur für B, nur in der Heute-Ansicht
 function dueItems(){
@@ -535,12 +535,14 @@ function cardRasen(t){
 const LOG_PH={Notiz:'Notiz, Stichworte mit Komma',erledigt:'Was gemacht? Stichworte, mit Komma',verschoben:'Warum verschoben?','nicht erledigt':'Warum nicht?'};
 function logArea(k,status){
   const d=cur(); const e=logOf(k,d); let h='';
-  if(S.logOpen===k&&status){
-    h+=`<div class="addrow"><input class="inp" id="log-${k}" placeholder="${LOG_PH[status]||'Notiz'}" value="${esc(e?.text||'')}" onkeydown="if(event.key==='Enter')saveLog('${k}','${status}')">
+  if(S.logOpen===k&&(status||e)){
+    const cur0=e?.status||status;
+    if(k==='finanz') h+=`<div class="addrow"><select class="inp" id="logst-${k}">${['erledigt','nicht erledigt','Notiz'].map(o=>`<option${o===cur0?' selected':''}>${o}</option>`).join('')}</select></div>`;
+    h+=`<div class="addrow"><input class="inp" id="log-${k}" placeholder="${LOG_PH[cur0]||'Notiz'}" value="${esc(e?.text||'')}" onkeydown="if(event.key==='Enter')saveLog('${k}','${status}')">
         <button class="btn primary" onclick="saveLog('${k}','${status}')">Speichern</button><button class="btn" onclick="S.logOpen=null;render()">✕</button></div>`;
   } else if(e){
     h+=`<div class="logline">📝 <span class="ws-sub">${esc(e.status||'')}</span> ${tagsHtml(e.text)}
-        ${status?`<button class="lnk" onclick="openLog('${k}')">ändern</button>`:''}<button class="lnk" onclick="delLog('${k}')">löschen</button></div>`;
+        <button class="lnk" onclick="openLog('${k}')">ändern</button><button class="lnk" onclick="delLog('${k}')">löschen</button></div>`;
   } else if(status){
     h+=`<div><button class="lnk" onclick="openLog('${k}')">📝 ${status==='erledigt'?'Was gemacht? eintragen':status==='Notiz'?'Notiz eintragen':'Begründung eintragen'}</button></div>`;
   }
@@ -558,6 +560,7 @@ async function saveLog(k,status,force){
   const el=document.getElementById('log-'+k);
   const text=(force!==undefined?force:(el?el.value:'')).split(',').map(x=>x.trim()).filter(Boolean).join(', ');
   const d=cur();
+  const sel=document.getElementById('logst-'+k); if(sel&&sel.value) status=sel.value;
   try{
     const r1=await db.from('log_entries').delete().eq('key',k).eq('date',d); if(r1.error) throw r1.error;
     const r=await db.from('log_entries').insert({key:k,date:d,status,text}).select().single(); if(r.error) throw r.error;
