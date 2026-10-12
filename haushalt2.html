@@ -820,14 +820,14 @@ function cardAqua(onlyDue){
   const nDue=all.filter(x=>x.due<=d&&!x.done).length;
   const hidden=all.length-vis.length;
   const sum=nDue?`<span class="overdue">${nDue} fällig</span>`:'alles im Plan';
-  let h=`<div class="ws"><div class="ws-head"><div><div class="ws-title">🐠 Aquarium <span class="ws-sub">(Anton)</span><!--WHEN--></div><div class="ws-sub">${sum}</div></div></div>`;
+  let h=`<div class="ws"><div class="ws-head"><div><div class="ws-title">🐠 Aquarium ${KID?'':'<span class="ws-sub">(Anton)</span>'}<!--WHEN--></div><div class="ws-sub">${sum}</div></div></div>`;
   h+=vis.length?vis.map(x=>aqRow(x.t,false)).join(''):'<div class="ws-sub" style="padding:6px 0">Nichts fällig (Termine immer Sa/So).</div>';
   if(!onlyDue){
     h+=`<div class="ws-extra"><div class="loghead"><span></span><span style="display:flex;gap:14px">`+
        (hidden||S.aqAll?`<button class="lnk" onclick="S.aqAll=!S.aqAll;render()">${S.aqAll?'▴ nur Anstehende':`› alle ${all.length} Aufgaben`}</button>`:'')+
        `<button class="lnk" onclick="S.aqRules=!S.aqRules;render()">Regeln ${S.aqRules?'▴':'›'}</button></span></div>`+
        (S.aqRules?`<div class="aq-note">${AQ_RULES.map(r=>'• '+esc(r)).join('<br>')}</div>`:'')+`</div>`;
-    h+=logArea('aquarium',all.some(x=>x.done)?'erledigt':'Notiz');
+    if(!KID) h+=logArea('aquarium',all.some(x=>x.done)?'erledigt':'Notiz');
   }
   return h+`</div>`;
 }
@@ -837,17 +837,9 @@ async function toggleAqua(id){
   const on=comp(id,d)?.status==='done';
   await setComp(id,d,on?null:'done');
 }
-function aqKidBlock(c){
-  const d=today(); const ts=aqTasks().filter(t=>t.child_name===c); if(!ts.length) return '';
-  const rows=ts.map(t=>({t,...aqInfo(t),done:comp(t.id,d)?.status==='done'}));
-  const show=rows.filter(x=>x.done||x.due<=d).sort((a,b)=>a.due.localeCompare(b.due));
-  const nxt=rows.filter(x=>!x.done&&x.due>d).sort((a,b)=>a.due.localeCompare(b.due))[0];
-  let h=`<div class="label">🐠 Aquarium</div>`;
-  if(show.length) h+=`<div class="card kid-big">${show.map(x=>aqRow(x.t,true)).join('')}</div>`;
-  else h+=`<div class="card" style="padding:12px 14px"><div class="ws-sub">Heute nichts fällig 🎉</div></div>`;
-  const up=rows.filter(x=>x.due>d).sort((a,b)=>a.due.localeCompare(b.due)).slice(0,5);
-  if(up.length) h+=`<div class="card" style="padding:10px 14px"><div class="ws-sub" style="font-weight:600;margin-bottom:4px">Als Nächstes</div>${up.map(x=>`<div class="aq-up"><span>${esc(x.t.text.replace(/\s*\(.*?\)/,''))}</span><span class="ws-sub">${aqWhen(x.due)}</span></div>`).join('')}</div>`;
-  return h;
+function aqKidBlock(c){   // gleiche Ansicht wie bei den Eltern (inkl. Abhaken), ohne Logbuch
+  if(!aqTasks().some(t=>t.child_name===c)) return '';
+  return `<div class="label">Aquarium</div><div class="card">${cardAqua()}</div>`;
 }
 
 // ── Planungstreffen E & B ──
