@@ -119,6 +119,11 @@ button{font:inherit;color:inherit}
 .loglist{margin-top:4px}
 .logitem{font-size:.82rem;padding:6px 0;border-top:1px solid var(--border)}
 .logitem:first-child{border-top:none}
+.aq-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:8px 0;border-top:1px solid var(--border)}
+.aq-row:first-of-type{border-top:none}
+.aq-main{flex:1;min-width:0;cursor:pointer}
+.aq-note{font-size:.8rem;opacity:.85;margin:3px 0 4px;line-height:1.35}
+.aq-warn{color:var(--orange);opacity:1}
 .mt-text.md{white-space:normal}
 .md p{margin:.35em 0}.md .mdh{margin:.7em 0 .25em;font-size:1rem}.md h2.mdh{font-size:1.1rem}
 .md hr{border:none;border-top:1px solid var(--border);margin:.6em 0}
@@ -367,7 +372,7 @@ async function setComp(taskId,d,status,extra={}){
   try{
     if(!status){ S.comp.delete(key); render();
       const r=await db.from('completions').delete().eq('task_id',taskId).eq('date',d); if(r.error) throw r.error; return; }
-    const row={task_id:taskId,date:d,status,done_by:S.user||'?',reason:null,child_name:extra.child_name??null};
+    const row={task_id:taskId,date:d,status,done_by:KID||S.user||'?',reason:null,child_name:extra.child_name??null};
     S.comp.set(key,{...(prev||{}),...row}); render();
     // löschen + neu anlegen statt upsert: die RLS-Regeln erlauben kein UPDATE auf completions
     { const d1=await db.from('completions').delete().eq('task_id',taskId).eq('date',d); if(d1.error) throw d1.error; }
@@ -470,7 +475,7 @@ function renderHeute(){
 }
 
 // ═══ Wochenstatus & Logbuch ══════════════════════════════════════
-const LOGK={hausfreitag:'🔧 Haus-Freitag',finanz:'💶 Finanz-Termin',wochenplan:'🗓 Wochen-Planung E&B',rasen:'🌱 Rasenmähen'};
+const LOGK={hausfreitag:'🔧 Haus-Freitag',finanz:'💶 Finanz-Termin',wochenplan:'🗓 Wochen-Planung E&B',aquarium:'🐠 Aquarium',rasen:'🌱 Rasenmähen'};
 const logOf=(k,d)=>S.log.find(e=>e.key===k&&e.date===d);
 const logsOf=k=>S.log.filter(e=>e.key===k).sort((a,b)=>b.date.localeCompare(a.date));
 const wsOf=(k,wk)=>S.weekly.get(`${wk}|${k}`)||{};
@@ -494,14 +499,16 @@ function dueItems(){
   }
   for(const r of byList('intervall')){ const {due}=intervalInfo(r);
     if(due<=t&&comp(r.id,t)?.status!=='done'&&!logOf('rasen',t)) out.push({key:'rasen',date:due,wk:monday(t),task:r}); }
-  return S.user==='B'?out:out.filter(x=>x.key==='wochenplan');   // E sieht nur die Wochen-Planung
+  const aqd=aqTasks().filter(x=>intervalInfo(x).due<=t&&comp(x.id,t)?.status!=='done').map(x=>intervalInfo(x).due).sort();
+  if(aqd.length) out.push({key:'aquarium',date:aqd[0],wk:monday(t)});
+  return S.user==='B'?out:out.filter(x=>x.key==='wochenplan'||x.key==='aquarium');   // E sieht nur Wochen-Planung und Aquarium
 }
 function renderDue(items){
   const t=today(); let h=`<div class="label" style="color:var(--orange)">⏰ Fällig</div><div class="card">`;
   for(const it of items){
     const late=it.date<t; const when=late?`offen seit ${WD[dow(it.date)]} ${dm(it.date)}`:'heute fällig';
     if(it.wk===monday(t)){
-      const body=it.key==='finanz'?cardFin():it.key==='wochenplan'?cardWP():it.key==='hausfreitag'?cardHaus():cardRasen(it.task);
+      const body=it.key==='finanz'?cardFin():it.key==='aquarium'?cardAqua(true):it.key==='wochenplan'?cardWP():it.key==='hausfreitag'?cardHaus():cardRasen(it.task);
       h+=body.replace('class="ws"',`class="ws ${late?'late-hl':'due-hl'}"`).replace('<!--WHEN-->',`<span class="${late?'overdue':'due'}"> · ${when}</span>`);
     } else {
       const jump=it.key==='finanz'?wkDay(it.wk,1):it.key==='wochenplan'?wkDay(it.wk,5):wkDay(it.wk,4);
@@ -516,6 +523,7 @@ function renderWochenstatus(skip=[]){
   if(!skip.includes('hausfreitag')) parts.push(cardHaus());
   if(!skip.includes('finanz')) parts.push(cardFin());
   if(!skip.includes('wochenplan')) parts.push(cardWP());
+  if(!skip.includes('aquarium')&&aqTasks().length) parts.push(cardAqua());
   if(!skip.includes('rasen')) for(const t of byList('intervall')) parts.push(cardRasen(t));
   if(!parts.length) return '';
   return `<div class="label">${monday(cur())===monday(today())?'Diese Woche':'Woche ab '+dm(monday(cur()))}</div><div class="card">${parts.join('')}</div>`;
@@ -565,8 +573,8 @@ function logArea(k,status){
   const d=cur(); const e=logOf(k,d); let h='';
   if(S.logOpen===k&&(status||e)){
     const cur0=e?.status||status;
-    const opts=k==='hausfreitag'?['erledigt','verschoben','nicht erledigt','Notiz']:['erledigt','nicht erledigt','Notiz'];
-    if(k==='finanz'||k==='wochenplan'||k==='hausfreitag') h+=`<div class="addrow"><select class="inp" id="logst-${k}">${opts.map(o=>`<option${o===cur0?' selected':''}>${o}</option>`).join('')}</select></div>`;
+    const opts=k==='hausfreitag'?['erledigt','verschoben','nicht erledigt','Notiz']:k==='aquarium'?['erledigt','Notiz']:['erledigt','nicht erledigt','Notiz'];
+    if(k==='finanz'||k==='wochenplan'||k==='hausfreitag'||k==='aquarium') h+=`<div class="addrow"><select class="inp" id="logst-${k}">${opts.map(o=>`<option${o===cur0?' selected':''}>${o}</option>`).join('')}</select></div>`;
     h+=`<div class="addrow"><input class="inp" id="log-${k}" placeholder="${LOG_PH[cur0]||'Notiz'}" value="${esc(e?.text||'')}" onkeydown="if(event.key==='Enter')saveLog('${k}','${status}')">
         <button class="btn primary" onclick="saveLog('${k}','${status}')">Speichern</button><button class="btn" onclick="S.logOpen=null;render()">✕</button></div>`;
   } else if(status&&!e){
@@ -769,6 +777,69 @@ function renderWoche(){
 }
 
 // ── Einkauf ──
+// ═══ Aquarium (Anton) ═══════════════════════════════════════════
+const aqTasks=()=>byList('aquarium');
+const aqDays=(a,b)=>Math.round((parse(a)-parse(b))/864e5);
+function aqTog(id){ S.aqOpen=S.aqOpen||{}; S.aqOpen[id]=!S.aqOpen[id]; render(); }
+// Regel: blaue Schwämme (bioPlus) und Cirax nie am selben Tag, mind. 4 Wochen Abstand
+function aqWarn(t){
+  const re=/bioPlus/.test(t.text)?/Cirax/:/Cirax/.test(t.text)?/bioPlus/:null; if(!re) return '';
+  const o=aqTasks().find(x=>re.test(x.text)); if(!o) return '';
+  const a=intervalInfo(t), b=intervalInfo(o); const nm=/Cirax/.test(o.text)?'Cirax':'blaue Schwämme';
+  const near=[b.due,b.last].filter(Boolean).find(x=>Math.abs(aqDays(a.due,x))<28);
+  return near?`<div class="aq-note aq-warn">⚠ ${nm}: ${near===b.last?'zuletzt':'fällig'} ${dm(near)} – mind. 4 Wochen Abstand, ggf. verschieben</div>`:'';
+}
+function aqRow(t,kid){
+  const {last,due}=intervalInfo(t); const d=cur(); const isT=d===today();
+  const done=comp(t.id,d)?.status==='done'; const c=comp(t.id,d);
+  const n=aqDays(due,d);
+  const st=done?`${isT?'heute':'am '+dm(d)} erledigt ✓ · nächstes Mal ab ${dm(due)}`:
+    n<0?`<span class="overdue">überfällig seit ${dm(due)}</span>`:n===0?`<span class="due">heute fällig</span>`:`fällig ab ${dm(due)} (in ${n} Tagen)`;
+  const open=(S.aqOpen||{})[t.id]||(!done&&n<=0);
+  const info=(open&&t.note?`<div class="aq-note">${esc(t.note)}</div>`:'')+(open&&!done?aqWarn(t):'');
+  const who=done&&c?.done_by?` <span class="badge ${esc(c.done_by)}">${esc(c.done_by)}</span>`:'';
+  if(kid) return `<div class="krow ${done?'mine':''}" onclick="toggleAqua('${sid(t.id)}')"><span class="kmark ${done?'on':''}">${done?'✓':''}</span><span class="ktxt">${esc(t.text)}<span class="ksub" style="display:block;font-size:.8rem;opacity:.75">${done?'heute erledigt ✓':n<0?'überfällig seit '+dm(due):'heute dran'}${last?' · zuletzt '+dm(last):''}</span>${info}</span></div>`;
+  return `<div class="aq-row"><div class="aq-main" onclick="aqTog('${sid(t.id)}')"><div class="ws-title" style="font-size:.95rem">${esc(t.text)}${who}</div>
+      <div class="ws-sub">${st}${last&&!done?' · zuletzt '+dm(last):''}</div>${info}</div>
+      <div class="pills"><button class="${done?'on good':''}" onclick="toggleAqua('${sid(t.id)}')">erledigt</button></div></div>`;
+}
+const AQ_RULES=['Blaue Schwämme und Cirax nie am selben Tag reinigen/ersetzen (mind. 2–4 Wochen Abstand).','Blaue Schwämme gestaffelt ersetzen: erst coarse, später fine, nicht alle auf einmal.','Blaue Schwämme nur in Aquarienwasser ausdrücken, nicht unter Leitungswasser.','Bei starkem Besatz / großen Fischen: bioPad und bioCarb häufiger.'];
+function cardAqua(onlyDue){
+  const d=cur();
+  const all=aqTasks().map(t=>({t,...intervalInfo(t),done:comp(t.id,d)?.status==='done'})).sort((a,b)=>a.due.localeCompare(b.due));
+  const horizon=addDays(d,14);
+  const vis=all.filter(x=>onlyDue?(x.due<=d&&!x.done):(S.aqAll||x.done||x.due<=horizon));
+  const nDue=all.filter(x=>x.due<=d&&!x.done).length;
+  const hidden=all.length-vis.length;
+  const sum=nDue?`<span class="overdue">${nDue} fällig</span>`:'alles im Plan';
+  let h=`<div class="ws"><div class="ws-head"><div><div class="ws-title">🐠 Aquarium <span class="ws-sub">(Anton)</span><!--WHEN--></div><div class="ws-sub">${sum}</div></div></div>`;
+  h+=vis.length?vis.map(x=>aqRow(x.t,false)).join(''):'<div class="ws-sub" style="padding:6px 0">In den nächsten 14 Tagen nichts fällig.</div>';
+  if(!onlyDue){
+    h+=`<div class="ws-extra"><div class="loghead"><span></span><span style="display:flex;gap:14px">`+
+       (hidden||S.aqAll?`<button class="lnk" onclick="S.aqAll=!S.aqAll;render()">${S.aqAll?'▴ nur Anstehende':`› alle ${all.length} Aufgaben`}</button>`:'')+
+       `<button class="lnk" onclick="S.aqRules=!S.aqRules;render()">Regeln ${S.aqRules?'▴':'›'}</button></span></div>`+
+       (S.aqRules?`<div class="aq-note">${AQ_RULES.map(r=>'• '+esc(r)).join('<br>')}</div>`:'')+`</div>`;
+    h+=logArea('aquarium',all.some(x=>x.done)?'erledigt':'Notiz');
+  }
+  return h+`</div>`;
+}
+async function toggleAqua(id){
+  if(!KID&&needUser()) return; const d=cur();
+  if(d>today()) return toast('Vorschau – erst am Tag selbst');
+  const on=comp(id,d)?.status==='done';
+  await setComp(id,d,on?null:'done');
+}
+function aqKidBlock(c){
+  const d=today(); const ts=aqTasks().filter(t=>t.child_name===c); if(!ts.length) return '';
+  const rows=ts.map(t=>({t,...intervalInfo(t),done:comp(t.id,d)?.status==='done'}));
+  const show=rows.filter(x=>x.done||x.due<=d).sort((a,b)=>a.due.localeCompare(b.due));
+  const nxt=rows.filter(x=>!x.done&&x.due>d).sort((a,b)=>a.due.localeCompare(b.due))[0];
+  let h=`<div class="label">🐠 Aquarium</div>`;
+  if(show.length) h+=`<div class="card kid-big">${show.map(x=>aqRow(x.t,true)).join('')}</div>`;
+  else h+=`<div class="card" style="padding:12px 14px"><div class="ws-sub">Heute nichts fällig 🎉${nxt?` · als Nächstes: ${esc(nxt.t.text)} am ${dm(nxt.due)}`:''}</div></div>`;
+  return h;
+}
+
 // ── Planungstreffen E & B ──
 // ── Mini-Markdown (sicher: erst escapen, dann formatieren) ──
 function mdInline(t){
@@ -895,7 +966,7 @@ function renderKid(main){
       return `<div class="krow ${s.k?'mine':''}" onclick="toggleKid('${sid(t.id)}','${c}')"><span class="kmark ${s.k?'on':''}">${s.k?'✓':''}</span><span class="ktxt">${esc(t.text)}${sub}</span>${vb}</div>`;
     }).join('')+`</div>`;
   }
-  h+=progress(mine,all,KCOL[c])+body+(all?'':'<div class="empty">Heute keine Aufgaben 🎉</div>');
+  h+=progress(mine,all,KCOL[c])+body+(all?'':'<div class="empty">Heute keine Aufgaben 🎉</div>')+aqKidBlock(c);
   main.innerHTML=h;
 }
 
