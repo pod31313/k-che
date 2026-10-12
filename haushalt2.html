@@ -124,6 +124,7 @@ button{font:inherit;color:inherit}
 .aq-main{flex:1;min-width:0;cursor:pointer}
 .aq-note{font-size:.8rem;opacity:.85;margin:3px 0 4px;line-height:1.35}
 .aq-warn{color:var(--orange);opacity:1}
+.aq-up{display:flex;justify-content:space-between;gap:10px;padding:4px 0;font-size:.88rem}
 .mt-text.md{white-space:normal}
 .md p{margin:.35em 0}.md .mdh{margin:.7em 0 .25em;font-size:1rem}.md h2.mdh{font-size:1.1rem}
 .md hr{border:none;border-top:1px solid var(--border);margin:.6em 0}
@@ -786,11 +787,14 @@ const aqWhen=due=>`Sa ${dm(due)}/So ${dm(addDays(due,1))}`;
 function aqTog(id){ S.aqOpen=S.aqOpen||{}; S.aqOpen[id]=!S.aqOpen[id]; render(); }
 // Regel: blaue Schwämme (bioPlus) und Cirax nie am selben Tag, mind. 4 Wochen Abstand
 function aqWarn(t){
-  const re=/bioPlus/.test(t.text)?/Cirax/:/Cirax/.test(t.text)?/bioPlus/:null; if(!re) return '';
-  const o=aqTasks().find(x=>re.test(x.text)); if(!o) return '';
-  const a=aqInfo(t), b=aqInfo(o); const nm=/Cirax/.test(o.text)?'Cirax':'blaue Schwämme';
-  const near=[b.due,b.last].filter(Boolean).find(x=>Math.abs(aqDays(a.due,x))<28);
-  return near?`<div class="aq-note aq-warn">⚠ ${nm}: ${near===b.last?'zuletzt':'fällig'} ${dm(near)} – mind. 4 Wochen Abstand, ggf. verschieben</div>`:'';
+  const isB=/bioPlus/.test(t.text), isC=/Cirax/.test(t.text); if(!isB&&!isC) return '';
+  const a=aqInfo(t);
+  for(const o of aqTasks().filter(x=>isB?/Cirax/.test(x.text):/bioPlus/.test(x.text))){
+    const b=aqInfo(o); const nm=isB?'Cirax':o.text.replace(/^bioPlus blau /,'blaue Schwämme ');
+    const near=[b.due,b.last].filter(Boolean).find(x=>Math.abs(aqDays(a.due,x))<28);
+    if(near) return `<div class="aq-note aq-warn">⚠ ${esc(nm)}: ${near===b.last?'zuletzt':'fällig'} ${dm(near)} – mind. 4 Wochen Abstand, ggf. verschieben</div>`;
+  }
+  return '';
 }
 function aqRow(t,kid){
   const {last,due}=aqInfo(t); const d=cur(); const isT=d===today();
@@ -812,12 +816,12 @@ function cardAqua(onlyDue){
   const d=cur();
   const all=aqTasks().map(t=>({t,...aqInfo(t),done:comp(t.id,d)?.status==='done'})).sort((a,b)=>a.due.localeCompare(b.due));
   const horizon=addDays(d,14);
-  const vis=all.filter(x=>onlyDue?(x.due<=d&&!x.done):(S.aqAll||x.done||x.due<=horizon));
+  const vis=all.filter((x,i)=>onlyDue?(x.due<=d&&!x.done):(S.aqAll||x.done||x.due<=horizon||i<3));
   const nDue=all.filter(x=>x.due<=d&&!x.done).length;
   const hidden=all.length-vis.length;
   const sum=nDue?`<span class="overdue">${nDue} fällig</span>`:'alles im Plan';
   let h=`<div class="ws"><div class="ws-head"><div><div class="ws-title">🐠 Aquarium <span class="ws-sub">(Anton)</span><!--WHEN--></div><div class="ws-sub">${sum}</div></div></div>`;
-  h+=vis.length?vis.map(x=>aqRow(x.t,false)).join(''):'<div class="ws-sub" style="padding:6px 0">In den nächsten 14 Tagen nichts fällig (Termine immer Sa/So).</div>';
+  h+=vis.length?vis.map(x=>aqRow(x.t,false)).join(''):'<div class="ws-sub" style="padding:6px 0">Nichts fällig (Termine immer Sa/So).</div>';
   if(!onlyDue){
     h+=`<div class="ws-extra"><div class="loghead"><span></span><span style="display:flex;gap:14px">`+
        (hidden||S.aqAll?`<button class="lnk" onclick="S.aqAll=!S.aqAll;render()">${S.aqAll?'▴ nur Anstehende':`› alle ${all.length} Aufgaben`}</button>`:'')+
@@ -840,7 +844,9 @@ function aqKidBlock(c){
   const nxt=rows.filter(x=>!x.done&&x.due>d).sort((a,b)=>a.due.localeCompare(b.due))[0];
   let h=`<div class="label">🐠 Aquarium</div>`;
   if(show.length) h+=`<div class="card kid-big">${show.map(x=>aqRow(x.t,true)).join('')}</div>`;
-  else h+=`<div class="card" style="padding:12px 14px"><div class="ws-sub">Heute nichts fällig 🎉${nxt?` · als Nächstes: ${esc(nxt.t.text)} ${aqWhen(nxt.due)}`:''}</div></div>`;
+  else h+=`<div class="card" style="padding:12px 14px"><div class="ws-sub">Heute nichts fällig 🎉</div></div>`;
+  const up=rows.filter(x=>x.due>d).sort((a,b)=>a.due.localeCompare(b.due)).slice(0,5);
+  if(up.length) h+=`<div class="card" style="padding:10px 14px"><div class="ws-sub" style="font-weight:600;margin-bottom:4px">Als Nächstes</div>${up.map(x=>`<div class="aq-up"><span>${esc(x.t.text.replace(/\s*\(.*?\)/,''))}</span><span class="ws-sub">${aqWhen(x.due)}</span></div>`).join('')}</div>`;
   return h;
 }
 
